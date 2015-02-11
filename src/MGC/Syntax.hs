@@ -1,4 +1,7 @@
-module MGC.Syntax (Identifier, Package, TopLevelDeclaration(..), Statement(..), Type(..), Expression(..)) where
+module MGC.Syntax (
+  Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), 
+  Declaration(..), FuncDecl(..), Statement(..), SimpleStatement(..), 
+  Type(..), Expression(..), TypeName(..), TypeLit(..), MethodSpec(..)) where
 
   type Identifier = String
   data QualIdent = QualIdent String String
@@ -9,11 +12,13 @@ module MGC.Syntax (Identifier, Package, TopLevelDeclaration(..), Statement(..), 
 
   data Declaration = TpDecl | VarDecl
 
-  data FuncDecl = FunctionDecl Identifier Signature Statement
+  data FuncDecl = FunctionDecl Identifier Signature Statement | FunctionSig Identifier Signature
 
-  data Signature = String
+  data Signature = Signature Parameters Parameters
 
-  data TpDecl = TypeDecl [(Identifier, Type)]
+  type Parameters = [(Identifier, Type)]
+
+  data TpDecl = TypeDecl Parameters
 
   data Expression = BinaryOp BinOp Expression Expression | UnaryExpr
   data UnaryExpr = PrimaryExpr | UnaryOp UOp UnaryExpr
@@ -24,13 +29,12 @@ module MGC.Syntax (Identifier, Package, TopLevelDeclaration(..), Statement(..), 
   data MulOp = Mult | Div | Mod | LShift | RShift | BOr | BAndXor
   data UOp = UnPlus | UnMinus | Not | BComp
 
-  data IncOp = Inc | Dec
 
   data PrimaryExpr = Operand
     | Conversion Type Expression
     | Selector PrimaryExpr Identifier
     | Index Expression
-    | Slice Expression Expression
+    | SliceExpr Expression Expression
     | TypeAssertion Type
     | Arguments [Expression]
 
@@ -48,7 +52,8 @@ module MGC.Syntax (Identifier, Package, TopLevelDeclaration(..), Statement(..), 
 
   data SimpleStatement = Empty
     | ExpressionStmt Expression
-    | IncDec Expression IncOp
+    | Inc Expression
+    | Dec Expression
     | Assignment [Expression] [Expression]
     | ShortDecl [Identifier] [Expression]
 
@@ -56,5 +61,5 @@ module MGC.Syntax (Identifier, Package, TopLevelDeclaration(..), Statement(..), 
 
   data Type = TypeName | TypeLit
   data TypeName = Name Identifier | QualName Identifier
-  data TypeLit = Array | Struct | Pointer | Function | Interface | SliceTp | Map | Channel
-
+  data TypeLit = Array Expression Type | Struct | Pointer Type | Function Signature| Interface [MethodSpec] | Slice Type
+  data MethodSpec = MethodSpec Identifier Signature | InterfaceName Identifier
