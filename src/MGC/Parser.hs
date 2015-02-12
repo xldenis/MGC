@@ -90,20 +90,44 @@ module MGC.Parser where
 
   typeDec :: Parser Declaration
   typeDec = do
-    string "type"
+    lexeme "type"
     typeSpec <|> parens $ many (typeSpec <* semi)
 
   typeSpec :: Parser (Identifier Type)
   typeSpec = do{return $ (identifier typeParser)}
 
   varDec :: Parser Declaration
+  varDec = do
+    lexeme "var"
+    return $ parens many (varSpec <* semi) <|> [varSpec]
 
-  --statement :: Parser Statement
+  varSpec = do
+    idents <- many identifier <* (lexeme ",")
+    tp <- case optionMaybe typeParser of
+      Just tp -> tp
+      Nothing -> Unit
+    lexeme "="
+    exprs <- many $ expression <* (lex ",")
+    if (length exprs) == (length idents)
+    then return $ VarSpec idents tp exprs
+    else fail $ "assign a value to every variable"
+
+    --statement :: Parser Statement
   --statement = returnStmt <|> ifStmt <|> switchStmt <|> forStmt <|> blockStmt
 
-  --returnStmt :: Parser Statement
+  returnStmt :: Parser Statement
+  returnStmt = do
+    reserved "return"
+    return $ Return expressionList
 
-  --ifStmt :: Parser Statement
+  ifStmt :: Parser Statement
+  ifStmt = do
+    reserved "if"  
+    stmt <- optionMaybe simpleStatement 
+    expr <- expression
+    left <- blockStmt
+    right <- reserved "else" *> option [] $ ifStmt <|> blockStmt
+    return $ If stmt expr left right
 
   --switchStmt :: Parser Statement
 
@@ -125,8 +149,17 @@ module MGC.Parser where
   assign :: Parser SimpleStatement
 
   shortDec :: Parser SimpleStatement
+  shortDec = try $ do
+    idents <- many identifier <* (lexeme ",")
+    exprs <- expressionList
+    if (length idents == length exprs)
+    then return $ ShortDecl idents exprs
+    else fail $ "left and right side of assign must match length"
 
   expression :: Parser Expression
+  --expression = unaryExpr <|> binaryExp use the parsec.language stuff
+
+  expressionList = many $ expression <* (lexeme ",")
 
   typeParser :: Parser Type
   typeParser = typeName <|> typeLit <|> (parens typeParser)
@@ -158,12 +191,12 @@ module MGC.Parser where
 
   functionType :: Parser TypeLit
   functionType = do
-    string "func"
+    lexeme "func"
     return $ Function signature
 
   interfaceType :: Parser TypeLit
   interfaceType = do
-    string "interface"
+    lexeme "interface"
     return $ Interface braces many (methodSpec <* semi)
 
   methodSpec :: Parser MethodSpec

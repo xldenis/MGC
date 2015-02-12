@@ -1,7 +1,7 @@
 module MGC.Syntax (
   Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), 
   Declaration(..), FuncDecl(..), Statement(..), SimpleStatement(..), 
-  Type(..), Expression(..), TypeName(..), TypeLit(..), MethodSpec(..)) where
+  Type(..), Expression(..), TypeName(..), TypeLit(..), MethodSpec(..), VarDecl(..), VarSpec(..)) where
 
   type Identifier = String
   data QualIdent = QualIdent String String
@@ -19,6 +19,9 @@ module MGC.Syntax (
   type Parameters = [(Identifier, Type)]
 
   data TpDecl = TypeDecl Parameters
+
+  type VarDecl = [VarSpec]
+  data VarSpec = VarSpec [Identifier] [Expression] Type
 
   data Expression = BinaryOp BinOp Expression Expression | UnaryExpr
   data UnaryExpr = PrimaryExpr | UnaryOp UOp UnaryExpr
@@ -41,7 +44,7 @@ module MGC.Syntax (
   data Statement = Print
     | PrintLn
     | Return [Expression]
-    | If SimpleStatement Expression Statement Statement
+    | If (Maybe SimpleStatement) Expression Statement Statement
     | Switch SimpleStatement Expression [SwitchClause]
     | For ForCond Statement
     | Continue
@@ -61,5 +64,5 @@ module MGC.Syntax (
 
   data Type = TypeName | TypeLit
   data TypeName = Name Identifier | QualName Identifier
-  data TypeLit = Array Expression Type | Struct | Pointer Type | Function Signature| Interface [MethodSpec] | Slice Type
+  data TypeLit = Array Expression Type | Struct | Pointer Type | Function Signature| Interface [MethodSpec] | Slice Type | Unit
   data MethodSpec = MethodSpec Identifier Signature | InterfaceName Identifier
