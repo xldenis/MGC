@@ -191,25 +191,25 @@ module MGC.Parser where
   blockStmt :: Parsec String u Statement
   blockStmt = Block <$> (braces $ statement `sepEndBy` semi)
 
-  simpleStatement :: Parsec String u SimpleStatement
+  simpleStatement :: Parsec String u Statement
   simpleStatement = exprStmt <|> incDec <|> assign <|> shortDec
   
-  exprStmt :: Parsec String u SimpleStatement
+  exprStmt :: Parsec String u Statement
   exprStmt = ExpressionStmt <$> expression
 
-  incDec :: Parsec String u SimpleStatement
+  incDec :: Parsec String u Statement
   incDec = do
     e <- expression
     (string "++" *> (return $ Inc e)) <|> (string "--" *> (return $ Dec e))
 
-  assign :: Parsec String u SimpleStatement
+  assign :: Parsec String u Statement
   assign = do
     lhs <- expressionList
     op <- (addOpParser <|> mulOpParser) <* lexeme "="
     rhs <- expressionList
     return $ Assignment op lhs rhs
 
-  shortDec :: Parsec String u SimpleStatement
+  shortDec :: Parsec String u Statement
   shortDec = try $ do
     idents <- identifierList
     exprs <- expressionList

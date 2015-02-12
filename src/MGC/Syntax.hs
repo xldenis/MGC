@@ -1,6 +1,6 @@
 module MGC.Syntax (
   Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), BinOp(..), UOp(..),
-  Statement(..), SimpleStatement(..), ForCond(..), SwitchClause(..),
+  Statement(..), ForCond(..), SwitchClause(..),
   Type(..), Expression(..), MethodSpec(..), VarSpec(..)) where
 
   type Identifier = String
@@ -37,21 +37,20 @@ module MGC.Syntax (
   data Statement = Print
     | PrintLn
     | Return [Expression]
-    | If (Maybe SimpleStatement) Expression Statement Statement
-    | Switch (Maybe SimpleStatement) (Maybe Expression) [SwitchClause]
+    | If (Maybe Statement) Expression Statement Statement
+    | Switch (Maybe Statement) (Maybe Expression) [SwitchClause]
     | For ForCond Statement
     | Continue
     | Break
     | Block [Statement]
-
-  data SimpleStatement = Empty
+    | Empty
     | ExpressionStmt Expression
     | Inc Expression
     | Dec Expression
     | Assignment BinOp [Expression] [Expression]
     | ShortDecl [Identifier] [Expression]
 
-  data ForCond = Condition Expression | ForClause SimpleStatement Expression SimpleStatement
+  data ForCond = Condition Expression | ForClause Statement Expression Statement
 
   data SwitchClause = Case (Maybe [Expression]) [Statement]
 
