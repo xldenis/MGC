@@ -1,5 +1,5 @@
 module MGC.Syntax (
-  Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), 
+  Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), BinOp(..), RelOp(..), AddOp(..), MulOp(..), UOp(..),
   Declaration(..), FuncDecl(..), Statement(..), SimpleStatement(..), ForCond(..), SwitchClause(..),
   Type(..), Expression(..), TypeName(..), TypeLit(..), MethodSpec(..), VarDecl(..), VarSpec(..)) where
 
@@ -29,7 +29,7 @@ module MGC.Syntax (
   data BinOp = Or | And | RelOp | AddOp | MulOp
   data RelOp = Eq | NEq | LessThan | LessThanEq | GreaterThan | GreaterThanEq
   data AddOp =  Plus | Minus | BinBitOr | BinBitXor
-  data MulOp = Mult | Div | Mod | LShift | RShift | BOr | BAndXor
+  data MulOp = Mult | Div | Mod | LShift | RShift | BinBitAnd | BinBitClear
   data UOp = UnPlus | UnMinus | Not | BComp
 
 
@@ -57,7 +57,7 @@ module MGC.Syntax (
     | ExpressionStmt Expression
     | Inc Expression
     | Dec Expression
-    | Assignment [Expression] [Expression]
+    | Assignment BinOp [Expression] [Expression]
     | ShortDecl [Identifier] [Expression]
 
   data SwitchClause = Case (Maybe [Expression]) [Statement]

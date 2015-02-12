@@ -53,11 +53,18 @@ module MGC.Parser where
   brackets = between (char "[") (char "]")
   braces = between (char "{") (char "}")
   semi = lexeme' ";"
+
   lexeme :: Parser String -> Parser String
   lexeme s = s <* (manyTill spaces (noneOf "\t\f\v"))
-  lexeme' :: Parser String -> Parser String
+  lexeme' :: Parser String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
   lexeme' s = s <* (manyTill spaces (oneOf "\n\r"))
 
+  addOpParser = (char "+" *> Add) <|> (char "-" *> Minus) <|> (char "|" *> BinBitOr) <|> (char "^" *> BinBitXor)
+  mulOpParser =(char "*" *> Mult) <|> (char "/" *> Div) <|> (char "%" *> Mod) <|> 
+    (char "<<" *> LShift) <|> (char ">>" *> RShift) <|> 
+    (char "&" *> BinBitAnd) <|> (char "&^" *> BinBitClear )
+
+  reserved :: Parser String
   reserved s = try $ do
     name <- lexeme s
     if (elem name reservedWords)
@@ -157,7 +164,8 @@ module MGC.Parser where
     postStmt <- simpleStatement
     return $ ForClause initStmt cond postStmt
 
-  --blockStmt :: Parser Statement
+  blockStmt :: Parser Statement
+  blockStmt = braces (many statement <* lexeme ";")
 
   simpleStatement :: Parser SimpleStatement
   simpleStatement = exprStmt <|> incDec <|> assign <|> shortDec
@@ -171,6 +179,11 @@ module MGC.Parser where
     return (string "++" *> Dec e) <|> (string "--" *> Dec e)
 
   assign :: Parser SimpleStatement
+  assign = do
+    lhs <- expressionList
+    op <- (addOpParser <|> mulOpParser) <* lexeme "="
+    rhs <- expressionList
+    return $ Assignment op lhs rhs
 
   shortDec :: Parser SimpleStatement
   shortDec = try $ do
