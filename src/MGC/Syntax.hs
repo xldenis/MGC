@@ -1,6 +1,6 @@
 module MGC.Syntax (
   Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), 
-  Declaration(..), FuncDecl(..), Statement(..), SimpleStatement(..), ForCond(..),
+  Declaration(..), FuncDecl(..), Statement(..), SimpleStatement(..), ForCond(..), SwitchClause(..),
   Type(..), Expression(..), TypeName(..), TypeLit(..), MethodSpec(..), VarDecl(..), VarSpec(..)) where
 
   type Identifier = String
@@ -60,7 +60,7 @@ module MGC.Syntax (
     | Assignment [Expression] [Expression]
     | ShortDecl [Identifier] [Expression]
 
-  data SwitchClause = Case [Expression] [Statement] | Default [Statement]
+  data SwitchClause = Case (Maybe [Expression]) [Statement]
 
   data Type = TypeName | TypeLit
   data TypeName = Name Identifier | QualName Identifier

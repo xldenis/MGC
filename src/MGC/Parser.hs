@@ -71,7 +71,7 @@ module MGC.Parser where
     then fail $ "cannot use reserved word " ++ name ++" as identifier" 
     else return $ name
 
-  topLevelDef :: Parser TopLevelDefinition
+  topLevelDef :: Parser TopLevelDeclaration
   topLevelDef = declaration <|> funcDec
 
   declaration :: Parser Declaration
@@ -82,7 +82,7 @@ module MGC.Parser where
     reserved "func"
     name <- lexeme identifier
     sig <- signature
-    case optionMaybe block of 
+    case optionMaybe blockStmt of 
       Just b -> return $ FunctionDecl name sig b
       Nothing -> return $ FunctionSig name sig
 
@@ -112,8 +112,8 @@ module MGC.Parser where
     then return $ VarSpec idents tp exprs
     else fail $ "assign a value to every variable"
 
-    --statement :: Parser Statement
-  --statement = returnStmt <|> ifStmt <|> switchStmt <|> forStmt <|> blockStmt
+  statement :: Parser Statement
+  statement = returnStmt <|> ifStmt <|> switchStmt <|> forStmt <|> blockStmt
 
   returnStmt :: Parser Statement
   returnStmt = do
@@ -129,7 +129,18 @@ module MGC.Parser where
     right <- reserved "else" *> option [] $ ifStmt <|> blockStmt
     return $ If stmt expr left right
 
-  --switchStmt :: Parser Statement
+  switchStmt :: Parser Statement
+  switchStmt = do
+    reserved "switch"
+    stmt <- optionMaybe $ simpleStatement <* semi
+    expr <- optionMaybe expression
+    clauses <- braces many exprCaseClause
+    return $ Switch stmt expr clauses
+
+  exprCaseClause = do
+    caseType <- lexeme "case" *> Just expressionList <|> lexeme "default" *> Nothing
+    lexeme ":"
+    return $ Case caseType (many statement <* lexeme "k")
 
   forStmt :: Parser Statement
   forStmt = do
@@ -145,7 +156,7 @@ module MGC.Parser where
     semi
     postStmt <- simpleStatement
     return $ ForClause initStmt cond postStmt
-    
+
   --blockStmt :: Parser Statement
 
   simpleStatement :: Parser SimpleStatement
