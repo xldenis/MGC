@@ -1,7 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
 module MGC.Parser where
   import MGC.Syntax
 
-  import Text.Parsec (try, many)
+  import Text.Parsec (try, many, sepEndBy, Parsec)
   import Text.Parsec.String
   --import Text.Parsec.Char (letter, char, digit, string, oneOf, satisfy, space, noneOf, anyChar)
   import Text.Parsec.Char
@@ -9,7 +10,7 @@ module MGC.Parser where
   import Control.Applicative ((<$>), (<*>), (<*), (*>), (<|>))
 
   reservedWords = [
-    "append"
+    "append",
     "bool",
     "break",
     "case",
@@ -49,171 +50,193 @@ module MGC.Parser where
   mulOps = ["*", "/", "%", "<<", ">>", "&", "&^"]
   unaryOps = ["+", "-", "!", "^"]
 
-  parens = between (char "(") (char ")")
-  brackets = between (char "[") (char "]")
-  braces = between (char "{") (char "}")
+  parens :: Parsec String u a -> Parsec String u a
+  parens = between (char '(') (char ')')
+  
+  brackets :: Parsec String u a -> Parsec String u a
+  brackets = between (char '[') (char ']')
+
+  braces :: Parsec String u a -> Parsec String u a
+  braces = between (char '{') (char '}')
+
   semi = lexeme' ";"
 
-  lexeme :: Parser String -> Parser String
-  lexeme s = s <* (manyTill spaces (noneOf "\t\f\v"))
-  lexeme' :: Parser String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
-  lexeme' s = s <* (manyTill spaces (oneOf "\n\r"))
+  lexeme :: String -> Parsec String u String
+  lexeme s = string s <* (manyTill spaces (noneOf "\t\f\v"))
+  lexeme' :: String -> Parsec String u String -- currently the same as lexeme. Needs to change so that it consumes \n\r
+  lexeme' s = string s <* (manyTill spaces (oneOf "\n\r"))
 
-  addOpParser = (char "+" *> Add) <|> (char "-" *> Minus) <|> (char "|" *> BinBitOr) <|> (char "^" *> BinBitXor)
-  mulOpParser =(char "*" *> Mult) <|> (char "/" *> Div) <|> (char "%" *> Mod) <|> 
-    (char "<<" *> LShift) <|> (char ">>" *> RShift) <|> 
-    (char "&" *> BinBitAnd) <|> (char "&^" *> BinBitClear )
+  addOpParser :: Parsec String u AddOp
+  addOpParser = (char '+' *> return Plus) <|> (char '-' *> return Minus) <|> (char '|' *> return BinBitOr) <|> (char '^' *> return BinBitXor)
 
-  reserved :: Parser String
+  mulOpParser :: Parsec String u MulOp
+  mulOpParser =(char '*' *> return Mult) <|> (char '/' *> return Div) <|> (char '%' *> return Mod) <|> 
+    (string "<<" *> return LShift) <|> (string ">>" *> return RShift) <|> 
+    (char '&' *> return BinBitAnd) <|> (string "&^" *> return BinBitClear )
+
+  reserved :: String -> Parsec String u String
   reserved s = try $ do
     name <- lexeme s
     if (elem name reservedWords)
     then return $ name
     else fail $  name ++"is not a reserved word" 
 
-  identifier :: Parser Identifier
+  identifier :: Parsec String u Identifier
   identifier = try $ do
-    name <- (++) <$> satisfy (oneOf "a-zA-Z") <*> manyTill anyChar (noneOf "_a-zA-Z0-9")
+    firstChar <- oneOf "a-zA-Z"
+    lastChars <- manyTill anyChar (noneOf "_a-zA-Z0-9")
+    let name = [firstChar] ++ lastChars
     if (elem name reservedWords)
     then fail $ "cannot use reserved word " ++ name ++" as identifier" 
     else return $ name
 
-  topLevelDef :: Parser TopLevelDeclaration
+  identifierList = identifier `sepEndBy` (lexeme ",")
+
+  topLevelDef :: Parsec String u TopLevelDeclaration
   topLevelDef = declaration <|> funcDec
 
-  declaration :: Parser Declaration
+  declaration :: Parsec String u Declaration
   declaration = typeDec <|> varDec
 
-  funcDec :: Parser FuncDecl
+  funcDec :: Parsec String u FuncDecl
   funcDec = do
     reserved "func"
-    name <- lexeme identifier
+    name <- identifier
     sig <- signature
     case optionMaybe blockStmt of 
       Just b -> return $ FunctionDecl name sig b
       Nothing -> return $ FunctionSig name sig
 
-  signature :: Parser Signature
+  signature :: Parsec String u Signature
+  signature = do
+    params <- parameters
+    result <- optionMaybe parameters
+    return $ Signature params result 
 
-  typeDec :: Parser Declaration
+  parameters = parens $ ((option [] identifierList) typeParser) `sepEndBy` lexeme ","
+
+  typeDec :: Parsec String u Declaration
   typeDec = do
     lexeme "type"
     typeSpec <|> parens $ many (typeSpec <* semi)
 
-  typeSpec :: Parser (Identifier Type)
+  typeSpec :: Parsec String u (Identifier, Type)
   typeSpec = do{return $ (identifier typeParser)}
 
-  varDec :: Parser Declaration
+  varDec :: Parsec String u Declaration
   varDec = do
     lexeme "var"
-    return $ parens many (varSpec <* semi) <|> [varSpec]
+    parens $ many (varSpec <* semi) <|> [varSpec]
 
   varSpec = do
-    idents <- many identifier <* (lexeme ",")
+    idents <- identifierList
     tp <- case optionMaybe typeParser of
       Just tp -> tp
       Nothing -> Unit
     lexeme "="
-    exprs <- many $ expression <* (lex ",")
+    exprs <- expressionList
     if (length exprs) == (length idents)
-    then return $ VarSpec idents tp exprs
+    then return $ VarSpec idents exprs tp
     else fail $ "assign a value to every variable"
 
-  statement :: Parser Statement
+  statement :: Parsec String u Statement
   statement = returnStmt <|> ifStmt <|> switchStmt <|> forStmt <|> blockStmt
 
-  returnStmt :: Parser Statement
+  returnStmt :: Parsec String u Statement
   returnStmt = do
     reserved "return"
-    return $ Return expressionList
+    Return <$> expressionList
 
-  ifStmt :: Parser Statement
+  ifStmt :: Parsec String u Statement
   ifStmt = do
     reserved "if"  
     stmt <- optionMaybe simpleStatement 
     expr <- expression
     left <- blockStmt
-    right <- reserved "else" *> option [] $ ifStmt <|> blockStmt
+    right <- reserved "else" *> (option [] $ ifStmt <|> blockStmt)
     return $ If stmt expr left right
 
-  switchStmt :: Parser Statement
+  switchStmt :: Parsec String u Statement
   switchStmt = do
     reserved "switch"
     stmt <- optionMaybe $ simpleStatement <* semi
     expr <- optionMaybe expression
-    clauses <- braces many exprCaseClause
+    clauses <- braces (many exprCaseClause) 
     return $ Switch stmt expr clauses
 
   exprCaseClause = do
-    caseType <- lexeme "case" *> Just expressionList <|> lexeme "default" *> Nothing
+    caseType <- lexeme "case" *> (Just <$> expressionList <|> lexeme "default" *> Nothing)
     lexeme ":"
-    return $ Case caseType (many statement <* lexeme "k")
+    stmts <- statement `sepEndBy` semi
+    return $ Case caseType stmts
 
-  forStmt :: Parser Statement
+  forStmt :: Parsec String u Statement
   forStmt = do
     reserved "for"
-    clause <- (Condition expression) <|> forClause
+    let clause = (Condition <$> expression) <|> forClause
     body <- blockStmt
     return $ For clause body
 
   forClause = do
     initStmt <- simpleStatement
     semi
-    cond <- (Condition expression)
+    cond <- expression
     semi
     postStmt <- simpleStatement
     return $ ForClause initStmt cond postStmt
 
-  blockStmt :: Parser Statement
-  blockStmt = braces (many statement <* lexeme ";")
+  blockStmt :: Parsec String u Statement
+  blockStmt = Block <$> (braces $ statement `sepEndBy` semi)
 
-  simpleStatement :: Parser SimpleStatement
+  simpleStatement :: Parsec String u SimpleStatement
   simpleStatement = exprStmt <|> incDec <|> assign <|> shortDec
   
-  exprStmt :: Parser SimpleStatement
-  exprStmt = do{return $ ExpressionStmt expression}
+  exprStmt :: Parsec String u SimpleStatement
+  exprStmt = ExpressionStmt <$> expression
 
-  incDec :: Parser SimpleStatement
+  incDec :: Parsec String u SimpleStatement
   incDec = do
     e <- expression
-    return (string "++" *> Dec e) <|> (string "--" *> Dec e)
+    (string "++" *> (return $ Inc e)) <|> (string "--" *> (return $ Dec e))
 
-  assign :: Parser SimpleStatement
+  assign :: Parsec String u SimpleStatement
   assign = do
     lhs <- expressionList
     op <- (addOpParser <|> mulOpParser) <* lexeme "="
     rhs <- expressionList
     return $ Assignment op lhs rhs
 
-  shortDec :: Parser SimpleStatement
+  shortDec :: Parsec String u SimpleStatement
   shortDec = try $ do
-    idents <- many identifier <* (lexeme ",")
+    idents <- identifierList
     exprs <- expressionList
     if (length idents == length exprs)
     then return $ ShortDecl idents exprs
     else fail $ "left and right side of assign must match length"
 
-  expression :: Parser Expression
+  expression :: Parsec String u Expression
   --expression = unaryExpr <|> binaryExp use the parsec.language stuff
+  expression = do{return $ Operand}
 
-  expressionList = many $ expression <* (lexeme ",")
+  expressionList = expression `sepEndBy` (lexeme ",")
 
-  typeParser :: Parser Type
+  typeParser :: Parsec String u Type
   typeParser = typeName <|> typeLit <|> (parens typeParser)
 
-  typeName :: Parser Type
+  typeName :: Parsec String u Type
   typeName = do{ return $ Name identifier}
 
-  typeLit :: Parser Type
+  typeLit :: Parsec String u Type
   typeLit = arrayType <|> structType <|> pointerType <|> functionType <|> interfaceType <|> sliceType
 
-  arrayType :: Parser TypeLit
-  arrayType = do{return $ Array (brackets expression) typeParser}
+  arrayType :: Parsec String u TypeLit
+  arrayType = do{ Array <$> (brackets expression) <*> typeParser}
 
-  sliceType :: Parser TypeLit
-  sliceType = do{char "[";char "]"; return $ Slice typeParser }
+  sliceType :: Parsec String u TypeLit
+  sliceType = do{char '[';char ']'; tp <- typeParser; return $ Slice tp }
 
-  --structType :: Parser TypeLit
+  structType :: Parsec String u TypeLit
+  structType = do {return Struct}
   --structType = do
   --  string "struct"
   --  braces many (fieldDecl <* semi)
@@ -221,21 +244,21 @@ module MGC.Parser where
   --fieldDecl = do
   --  many identifier <* (char ",") <|> 
 
-  pointerType :: Parser TypeLit
+  pointerType :: Parsec String u TypeLit
   pointerType = do 
-    char "*"
-    return $ Pointer typeParser
+    char '*'
+    Pointer <$> typeParser
 
-  functionType :: Parser TypeLit
+  functionType :: Parsec String u TypeLit
   functionType = do
     lexeme "func"
-    return $ Function signature
+    Function <$> signature
 
-  interfaceType :: Parser TypeLit
+  interfaceType :: Parsec String u TypeLit
   interfaceType = do
     lexeme "interface"
-    return $ Interface braces many (methodSpec <* semi)
+    Interface <$> (braces $ many (methodSpec <* semi))
 
-  methodSpec :: Parser MethodSpec
+  methodSpec :: Parsec String u MethodSpec
   methodSpec = do
-    return (MethodSpec signature <|> InterfaceName identifier)
+    (MethodSpec <$> identifier <*> signature <|> InterfaceName <$> identifier)

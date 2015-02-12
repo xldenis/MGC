@@ -1,7 +1,7 @@
 module MGC.Syntax (
   Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), BinOp(..), RelOp(..), AddOp(..), MulOp(..), UOp(..),
   Declaration(..), FuncDecl(..), Statement(..), SimpleStatement(..), ForCond(..), SwitchClause(..),
-  Type(..), Expression(..), TypeName(..), TypeLit(..), MethodSpec(..), VarDecl(..), VarSpec(..)) where
+  Type(..), Expression(..), TypeName(..), TypeLit(..), MethodSpec(..), VarDecl(..), VarSpec(..), PrimaryExpr(..)) where
 
   type Identifier = String
   data QualIdent = QualIdent String String
@@ -14,13 +14,14 @@ module MGC.Syntax (
 
   data FuncDecl = FunctionDecl Identifier Signature Statement | FunctionSig Identifier Signature
 
-  data Signature = Signature Parameters Parameters
+  data Signature = Signature Parameters (Maybe Parameters)
 
   type Parameters = [(Identifier, Type)]
 
   data TpDecl = TypeDecl Parameters
 
   type VarDecl = [VarSpec]
+  
   data VarSpec = VarSpec [Identifier] [Expression] Type
 
   data Expression = BinaryOp BinOp Expression Expression | UnaryExpr
