@@ -8,6 +8,7 @@ module MGC.Parser where
   import Text.Parsec.Char
   import Text.Parsec.Combinator
   import Control.Applicative ((<$>), (<*>), (<*), (*>), (<|>))
+  import Control.Monad ((>>))
 
   reservedWords = [
     "append",
@@ -66,10 +67,10 @@ module MGC.Parser where
   lexeme' :: String -> Parsec String u String -- currently the same as lexeme. Needs to change so that it consumes \n\r
   lexeme' s = string s <* (manyTill spaces (oneOf "\n\r"))
 
-  addOpParser :: Parsec String u AddOp
+  addOpParser :: Parsec String u BinOp
   addOpParser = (char '+' *> return Plus) <|> (char '-' *> return Minus) <|> (char '|' *> return BinBitOr) <|> (char '^' *> return BinBitXor)
 
-  mulOpParser :: Parsec String u MulOp
+  mulOpParser :: Parsec String u BinOp
   mulOpParser =(char '*' *> return Mult) <|> (char '/' *> return Div) <|> (char '%' *> return Mod) <|> 
     (string "<<" *> return LShift) <|> (string ">>" *> return RShift) <|> 
     (char '&' *> return BinBitAnd) <|> (string "&^" *> return BinBitClear )
@@ -95,17 +96,17 @@ module MGC.Parser where
   topLevelDef :: Parsec String u TopLevelDeclaration
   topLevelDef = declaration <|> funcDec
 
-  declaration :: Parsec String u Declaration
+  declaration :: Parsec String u TopLevelDeclaration
   declaration = typeDec <|> varDec
 
-  funcDec :: Parsec String u FuncDecl
+  funcDec :: Parsec String u TopLevelDeclaration
   funcDec = do
     reserved "func"
     name <- identifier
     sig <- signature
-    case optionMaybe blockStmt of 
-      Just b -> return $ FunctionDecl name sig b
-      Nothing -> return $ FunctionSig name sig
+    body <- optionMaybe blockStmt
+
+    return $ FunctionDecl name sig body
 
   signature :: Parsec String u Signature
   signature = do
@@ -113,26 +114,28 @@ module MGC.Parser where
     result <- optionMaybe parameters
     return $ Signature params result 
 
-  parameters = parens $ ((option [] identifierList) typeParser) `sepEndBy` lexeme ","
+  parameters = parens $ do{ids<-(option [] identifierList); tp<-typeParser; return (ids, tp)}`sepEndBy` lexeme ","
 
-  typeDec :: Parsec String u Declaration
+  typeDec :: Parsec String u TopLevelDeclaration
   typeDec = do
     lexeme "type"
-    typeSpec <|> parens $ many (typeSpec <* semi)
+    TypeDecl <$> ( (flip (:) []) <$> typeSpec <|> (parens $ typeSpec `sepEndBy` semi))
 
   typeSpec :: Parsec String u (Identifier, Type)
-  typeSpec = do{return $ (identifier typeParser)}
+  typeSpec =  (,) <$> identifier <*> typeParser
 
-  varDec :: Parsec String u Declaration
+  varDec :: Parsec String u TopLevelDeclaration
   varDec = do
     lexeme "var"
-    parens $ many (varSpec <* semi) <|> [varSpec]
+    VarDecl <$> (parens $ (varSpec `sepEndBy` semi))
 
   varSpec = do
     idents <- identifierList
-    tp <- case optionMaybe typeParser of
-      Just tp -> tp
-      Nothing -> Unit
+
+    tp <- (\x -> case x of
+      Just t -> t
+      Nothing -> Unit) <$> optionMaybe typeParser
+
     lexeme "="
     exprs <- expressionList
     if (length exprs) == (length idents)
@@ -153,7 +156,7 @@ module MGC.Parser where
     stmt <- optionMaybe simpleStatement 
     expr <- expression
     left <- blockStmt
-    right <- reserved "else" *> (option [] $ ifStmt <|> blockStmt)
+    right <- reserved "else" >> (ifStmt <|> blockStmt)
     return $ If stmt expr left right
 
   switchStmt :: Parsec String u Statement
@@ -165,7 +168,7 @@ module MGC.Parser where
     return $ Switch stmt expr clauses
 
   exprCaseClause = do
-    caseType <- lexeme "case" *> (Just <$> expressionList <|> lexeme "default" *> Nothing)
+    caseType <- lexeme "case" >> (Just <$> expressionList <|> (lexeme "default" >> return Nothing))
     lexeme ":"
     stmts <- statement `sepEndBy` semi
     return $ Case caseType stmts
@@ -173,9 +176,9 @@ module MGC.Parser where
   forStmt :: Parsec String u Statement
   forStmt = do
     reserved "for"
-    let clause = (Condition <$> expression) <|> forClause
+    cond <- (Condition <$> expression) <|> forClause
     body <- blockStmt
-    return $ For clause body
+    return $ For cond body
 
   forClause = do
     initStmt <- simpleStatement
@@ -216,7 +219,7 @@ module MGC.Parser where
 
   expression :: Parsec String u Expression
   --expression = unaryExpr <|> binaryExp use the parsec.language stuff
-  expression = do{return $ Operand}
+  expression = return Operand
 
   expressionList = expression `sepEndBy` (lexeme ",")
 
@@ -224,18 +227,18 @@ module MGC.Parser where
   typeParser = typeName <|> typeLit <|> (parens typeParser)
 
   typeName :: Parsec String u Type
-  typeName = do{ return $ Name identifier}
+  typeName = Name <$> identifier
 
   typeLit :: Parsec String u Type
   typeLit = arrayType <|> structType <|> pointerType <|> functionType <|> interfaceType <|> sliceType
 
-  arrayType :: Parsec String u TypeLit
+  arrayType :: Parsec String u Type
   arrayType = do{ Array <$> (brackets expression) <*> typeParser}
 
-  sliceType :: Parsec String u TypeLit
+  sliceType :: Parsec String u Type
   sliceType = do{char '[';char ']'; tp <- typeParser; return $ Slice tp }
 
-  structType :: Parsec String u TypeLit
+  structType :: Parsec String u Type
   structType = do {return Struct}
   --structType = do
   --  string "struct"
@@ -244,17 +247,17 @@ module MGC.Parser where
   --fieldDecl = do
   --  many identifier <* (char ",") <|> 
 
-  pointerType :: Parsec String u TypeLit
+  pointerType :: Parsec String u Type
   pointerType = do 
     char '*'
     Pointer <$> typeParser
 
-  functionType :: Parsec String u TypeLit
+  functionType :: Parsec String u Type
   functionType = do
     lexeme "func"
     Function <$> signature
 
-  interfaceType :: Parsec String u TypeLit
+  interfaceType :: Parsec String u Type
   interfaceType = do
     lexeme "interface"
     Interface <$> (braces $ many (methodSpec <* semi))
