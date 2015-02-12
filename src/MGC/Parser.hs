@@ -131,8 +131,21 @@ module MGC.Parser where
 
   --switchStmt :: Parser Statement
 
-  --forStmt :: Parser Statement
+  forStmt :: Parser Statement
+  forStmt = do
+    reserved "for"
+    clause <- (Condition expression) <|> forClause
+    body <- blockStmt
+    return $ For clause body
 
+  forClause = do
+    initStmt <- simpleStatement
+    semi
+    cond <- (Condition expression)
+    semi
+    postStmt <- simpleStatement
+    return $ ForClause initStmt cond postStmt
+    
   --blockStmt :: Parser Statement
 
   simpleStatement :: Parser SimpleStatement

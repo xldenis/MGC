@@ -1,6 +1,6 @@
 module MGC.Syntax (
   Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), 
-  Declaration(..), FuncDecl(..), Statement(..), SimpleStatement(..), 
+  Declaration(..), FuncDecl(..), Statement(..), SimpleStatement(..), ForCond(..),
   Type(..), Expression(..), TypeName(..), TypeLit(..), MethodSpec(..), VarDecl(..), VarSpec(..)) where
 
   type Identifier = String
