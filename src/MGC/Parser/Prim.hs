@@ -43,7 +43,7 @@ module MGC.Parser.Prim where
   identifier :: Parser Identifier
   identifier = try $ do
     firstChar <- letter <|> char '_'
-    lastChars <- many $ oneOf (['a'..'z']++['A'..'Z']++['0'..'9'])
+    lastChars <- (many $ oneOf (['a'..'z']++['A'..'Z']++['0'..'9'])) <* lineSpace
     let name = [firstChar] ++ lastChars
     if (elem name reservedWords)
     then fail $ "cannot use reserved word " ++ name ++" as identifier" 

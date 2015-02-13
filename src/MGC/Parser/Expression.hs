@@ -13,11 +13,13 @@ module MGC.Parser.Expression  where
   relOps = [("==", Eq), ("!=", NEq),("<", LessThan), ("<=", LessThanEq), (">", GreaterThan), (">=", GreaterThanEq)]
   addOps = [("+", Plus), ("-", Minus), ("|", BitOr), ("^", BitXor)]
   mulOps = [("*", Mult),("/", Div), ("%",Mod),("<<",LShift), (">>", RShift),("&", BitAnd),("&^", BitClear)]
-  unaryOps = ["+", "-", "!", "^"]
+  unaryOps = [("+", Pos), ("-",Neg), ("!", Not), ("^", BComp) ]
 
 
   table = [
-     (map (\(s,tp) -> binary s tp AssocLeft) mulOps)
+      [Postfix (selector) ]
+   , (map (\(s,tp) -> prefix s tp) unaryOps)
+   , (map (\(s,tp) -> binary s tp AssocLeft) mulOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) addOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) relOps)
    , [binary "&&" (And) AssocLeft]
@@ -39,7 +41,7 @@ module MGC.Parser.Expression  where
   expression = buildExpressionParser table primaryExpr <?> "Expression"
 
   primaryExpr :: Parser Expression
-  primaryExpr = operand <|> index <|> selector
+  primaryExpr = (operand) <* lineSpace
 
   operand :: Parser Expression
   operand = literal <|> (parens expression)
@@ -47,8 +49,8 @@ module MGC.Parser.Expression  where
   --conversion :: Parser Expression
   --conversion = liftM2 typeParser (parens $ expression <* optional lexeme "," )
 
-  selector :: Parser Expression 
-  selector = try $ liftM2 Selector (primaryExpr <* char '.') identifier
+  --selector :: Parser Expression 
+  selector = try $ do{char '.'; i <- identifier;  return $ (flip Selector) i}
 
   index :: Parser Expression
   index = try $ liftM Index (brackets expression)

@@ -35,7 +35,7 @@ module MGC.Syntax (
     | Plus | Minus | BitOr | BitXor
     | Mult | Div | Mod | LShift | RShift | BitAnd | BitClear  deriving (Show, Eq)
     
-  data UOp = UnPlus | UnMinus | Not | BComp  deriving (Show, Eq)
+  data UOp = Pos | Neg | Not | BComp  deriving (Show, Eq)
 
   data Statement = Print
     | PrintLn
