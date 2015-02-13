@@ -22,13 +22,14 @@ module MGC.Syntax (
    | UnaryOp UOp Expression
    | Conversion Type Expression
    | Selector Expression Identifier
-   | Index Expression
+   | Index Expression Expression
    | SimpleSlice Expression Expression
    | FullSlice Expression Expression Expression
    | TypeAssertion Type
    | Arguments [Expression]
    | Operand
-   | Integer Int  deriving (Show, Eq)
+   | Integer Int  
+   | String String deriving (Show, Eq)
 
   data BinOp = Or | And 
     | Eq | NEq | LessThan | LessThanEq | GreaterThan | GreaterThanEq

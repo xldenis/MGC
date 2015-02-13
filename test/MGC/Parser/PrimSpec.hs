@@ -23,6 +23,15 @@ module MGC.Parser.PrimSpec (spec) where
           intLit `parses` "0" `to` (Integer 0)
         it "eats whitespace" $ do
           (intLit <* eof) `parses` "0 " `to` (Integer 0)
+      describe "string" $ do
+        it "parses interpreted strings" $ do
+          pending
+        it "parses literal strings" $ do
+          pending
+        it "parses unicode literals" $ do
+          stringLit `parses` "\"\\u0000\"" `to` (String "\0000")
+        it "parses escape sequences" $ do
+          pending
     describe "identifier" $ do
       it "recognizes strings" $ do
         identifier `parses` "akadjfkadjfkl" `to` ("akadjfkadjfkl")

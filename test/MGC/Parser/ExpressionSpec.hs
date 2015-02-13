@@ -12,11 +12,13 @@ module MGC.Parser.ExpressionSpec (spec) where
         expression `parses` "0 == 0 " `to` (BinaryOp Eq (Integer 0) (Integer 0))
         expression `parses` "0&&0" `to` (BinaryOp And (Integer 0) (Integer 0))
       it "parses complex expressions" $ do
-        expression `parses` "(0+1).count ^ 0x5" `to` (BinaryOp BitXor (Selector (BinaryOp Plus (Integer 0) $ Integer 0) "count") (Integer 5))
+        expression `parses` "(0+1).count ^ 0x5" `to` (BinaryOp BitXor (Selector (BinaryOp Plus (Integer 0) $ Integer 1) "count") (Integer 5))
       it "parses different precedences" $ do 
         expression `parses` "0+1^ 2" `to` (BinaryOp BitXor (BinaryOp Plus (Integer 0) (Integer 1)) (Integer 2))
       it "handles parens" $ do
         expression `parses` "(0+1) + 1" `to` BinaryOp Plus (BinaryOp Plus (Integer 0) $ Integer 1) (Integer 1)
+      it "parses array indices" $ do
+        expression `parses` "0[0]" `to` (Index (Integer 0) (Integer 0))
     describe "expression Term" $ do
       it "parses literals" $ do
         parse primaryExpr "" "0x15" `to` (Integer 21)
@@ -27,7 +29,7 @@ module MGC.Parser.ExpressionSpec (spec) where
         operand `parses` "(0)" `to` Integer 0
     describe "slice" $ do
       it "parses constant indices" $ do
-        index `parses` "[0]" `to` Index (Integer 0)
+        pending
     describe "selector" $ do
       it "parses `(0).method`" $ do
         expression `parses` "(0).method " `to` Selector (Integer 0) "method"

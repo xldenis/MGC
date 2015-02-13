@@ -4,8 +4,8 @@ module MGC.Parser.Prim where
   import Data.Char 
   
   import Numeric
-  import Control.Applicative ((<*), (*>))
-  import Control.Monad (liftM, (>>))
+  import Control.Applicative ((<*), (*>), (<$>), (<*>))
+  import Control.Monad (liftM, liftM2, (>>))
   import MGC.Syntax
 
   reservedWords = [ 
@@ -22,13 +22,16 @@ module MGC.Parser.Prim where
 
   braces :: Parser a -> Parser a
   braces = between (char '{') (char '}')
-
+  quotes :: Parser a -> Parser a
+  quotes = between (char '"') (char '"')
+  ticks :: Parser a -> Parser a
+  ticks = between (char '`') (char '`')
   semi = lexeme' ";"
 
   lexeme :: String -> Parser String
   lexeme s = string s <* lineSpace
   lexeme' :: String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
-  lexeme' s = string s <* (many spaces)
+  lexeme' s = string s <* spaces
 
   lineSpace :: Parser ()
   lineSpace = try $ many (satisfy (\x -> isSpace x && not (x == '\n' || x == '\r'))) >> return ()
@@ -43,7 +46,7 @@ module MGC.Parser.Prim where
   identifier :: Parser Identifier
   identifier = try $ do
     firstChar <- letter <|> char '_'
-    lastChars <- (many $ oneOf (['a'..'z']++['A'..'Z']++['0'..'9'])) <* lineSpace
+    lastChars <- (many $ (alphaNum <|> char '_')) <* lineSpace
     let name = [firstChar] ++ lastChars
     if (elem name reservedWords)
     then fail $ "cannot use reserved word " ++ name ++" as identifier" 
@@ -53,7 +56,22 @@ module MGC.Parser.Prim where
 
   literal = basicLit
 
-  basicLit = intLit
+  basicLit = intLit <|> stringLit
+
+  stringLit = String <$> (quotes (interpretedString) <|> ticks (many anyChar))
+
+  interpretedString :: Parser String
+  interpretedString = many $ unicodeEscape <|> escapeSeq <|> (noneOf "\n\"")
+
+  unicodeEscape :: Parser Char
+  unicodeEscape = try $ do
+    len <- char '\\' *> (char 'u' <|> char 'U')
+    case len of 
+      'U' ->  fst . head . readLitChar . ((++) "\\") <$> count 8 hexDigit
+      'u' ->  fst . head . readLitChar . ((++) "\\") <$> count 4 hexDigit
+
+  escapeSeq :: Parser Char
+  escapeSeq = try $ (char '\\') *> liftM ( fst . head . readLitChar . (:) '\\' . (flip (:) [])) (oneOf "abfnrtv\\'\"")
 
   intLit ::  Parser Expression
   intLit = (hexLit <|> octLit <|> decimalLit) <* lineSpace

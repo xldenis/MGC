@@ -17,7 +17,7 @@ module MGC.Parser.Expression  where
 
 
   table = [
-      [Postfix (selector) ]
+     [Postfix (selector), Postfix (index) ]
    , (map (\(s,tp) -> prefix s tp) unaryOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) mulOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) addOps)
@@ -49,11 +49,11 @@ module MGC.Parser.Expression  where
   --conversion :: Parser Expression
   --conversion = liftM2 typeParser (parens $ expression <* optional lexeme "," )
 
-  --selector :: Parser Expression 
-  selector = try $ do{char '.'; i <- identifier;  return $ (flip Selector) i}
+  selector :: Parser (Expression -> Expression)
+  selector = try $ do{lexeme' "."; i <- identifier;  return $ (flip Selector) i}
 
-  index :: Parser Expression
-  index = try $ liftM Index (brackets expression)
+  index :: Parser (Expression -> Expression)
+  index = try $ liftM (flip Index) (brackets expression)
 
   slice :: Parser Expression
   slice = try $ brackets $ do 
@@ -64,6 +64,7 @@ module MGC.Parser.Expression  where
     case a of
       Just e3 -> return $ FullSlice e1 e2 e3
       Nothing -> return $ SimpleSlice e1 e2
+    
   --typeAssertion :: Parser Expression
   --typeAssertion  = char '.' >> parens typeParser
 
