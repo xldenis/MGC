@@ -1,10 +1,10 @@
-module MGC.Parser.Expression (expression)  where 
+module MGC.Parser.Expression  where 
   import Text.Parsec.Expr
   import Text.Parsec.String
   import Text.Parsec
 
   import Control.Applicative ((<$>), (<*), (<*>))
-  import Control.Monad ((>>), liftM2)
+  import Control.Monad ((>>), liftM2, liftM)
 
   import MGC.Syntax
   import MGC.Parser.Prim
@@ -29,7 +29,7 @@ module MGC.Parser.Expression (expression)  where
   expression = buildExpressionParser table primaryExpr <?> "Expression"
 
   primaryExpr :: Parser Expression
-  primaryExpr = selector <|> index <|> slice 
+  primaryExpr = operand <|> index <|> selector
 
   operand :: Parser Expression
   operand = literal <|> (parens expression)
@@ -38,13 +38,13 @@ module MGC.Parser.Expression (expression)  where
   --conversion = liftM2 typeParser (parens $ expression <* optional lexeme "," )
 
   selector :: Parser Expression 
-  selector = liftM2 Selector primaryExpr identifier
+  selector = try $ liftM2 Selector (primaryExpr <* char '.') identifier
 
   index :: Parser Expression
-  index = liftM2 Selector (brackets expression) identifier
+  index = try $ liftM Index (brackets expression)
 
   slice :: Parser Expression
-  slice = brackets expression 
+  slice = try $ brackets expression 
 
   --typeAssertion :: Parser Expression
   --typeAssertion  = char '.' >> parens typeParser

@@ -1,5 +1,1 @@
-import System.Environment
-import MGC.Parser
-
-main :: IO ()
-main = print "As"
+{-# OPTIONS_GHC -F -pgmF hspec-discover #-}

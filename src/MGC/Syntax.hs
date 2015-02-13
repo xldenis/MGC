@@ -10,13 +10,13 @@ module MGC.Syntax (
 
   data TopLevelDeclaration = FunctionDecl Identifier Signature (Maybe Statement)
     | TypeDecl [(Identifier, Type)] 
-    | VarDecl [VarSpec]
+    | VarDecl [VarSpec] deriving (Show, Eq)
 
-  data Signature = Signature Parameters (Maybe Parameters)
+  data Signature = Signature Parameters (Maybe Parameters) deriving (Show, Eq)
 
   type Parameters = [([Identifier], Type)]
 
-  data VarSpec = VarSpec [Identifier] [Expression] Type
+  data VarSpec = VarSpec [Identifier] [Expression] Type  deriving (Show, Eq)
 
   data Expression = BinaryOp BinOp Expression Expression
    | UnaryOp UOp Expression
@@ -27,13 +27,13 @@ module MGC.Syntax (
    | TypeAssertion Type
    | Arguments [Expression]
    | Operand
-   | Integer Int
+   | Integer Int  deriving (Show, Eq)
   data BinOp = Or | And 
     | Eq | NEq | LessThan | LessThanEq | GreaterThan | GreaterThanEq
     | Plus | Minus | BitOr | BitXor
-    | Mult | Div | Mod | LShift | RShift | BitAnd | BitClear
+    | Mult | Div | Mod | LShift | RShift | BitAnd | BitClear  deriving (Show, Eq)
     
-  data UOp = UnPlus | UnMinus | Not | BComp
+  data UOp = UnPlus | UnMinus | Not | BComp  deriving (Show, Eq)
 
   data Statement = Print
     | PrintLn
@@ -49,11 +49,11 @@ module MGC.Syntax (
     | Inc Expression
     | Dec Expression
     | Assignment BinOp [Expression] [Expression]
-    | ShortDecl [Identifier] [Expression]
+    | ShortDecl [Identifier] [Expression]  deriving (Show, Eq)
 
-  data ForCond = Condition Expression | ForClause Statement Expression Statement
+  data ForCond = Condition Expression | ForClause Statement Expression Statement  deriving (Show, Eq)
 
-  data SwitchClause = Case (Maybe [Expression]) [Statement]
+  data SwitchClause = Case (Maybe [Expression]) [Statement]  deriving (Show, Eq)
 
   data Type = Name Identifier 
     | QualName Identifier
@@ -62,6 +62,6 @@ module MGC.Syntax (
     | Function Signature
     | Interface [MethodSpec] 
     | Slice Type 
-    | Unit
+    | Unit  deriving (Show, Eq)
 
-  data MethodSpec = MethodSpec Identifier Signature | InterfaceName Identifier
+  data MethodSpec = MethodSpec Identifier Signature | InterfaceName Identifier  deriving (Show, Eq)

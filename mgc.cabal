@@ -44,7 +44,6 @@ test-suite tests
   hs-source-dirs:     test
   build-depends:      base >=4.7, 
                       parsec >= 3.0,
-                      tasty >= 0.7,
-                      tasty-hspec,
                       hspec,
+                      hspec-expectations,
                       mgc

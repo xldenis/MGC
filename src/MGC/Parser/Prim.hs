@@ -25,9 +25,9 @@ module MGC.Parser.Prim where
   semi = lexeme' ";"
 
   lexeme :: String -> Parsec String u String
-  lexeme s = string s <* (manyTill spaces (noneOf "\t\f\v"))
+  lexeme s = string s <* (many (oneOf "\t\f\v"))
   lexeme' :: String -> Parsec String u String -- currently the same as lexeme. Needs to change so that it consumes \n\r
-  lexeme' s = string s <* (manyTill spaces (oneOf "\n\r"))
+  lexeme' s = string s <* (many spaces)
 
   reserved :: String -> Parsec String u String
   reserved s = try $ do
@@ -38,8 +38,8 @@ module MGC.Parser.Prim where
 
   identifier :: Parsec String u Identifier
   identifier = try $ do
-    firstChar <- letter
-    lastChars <- manyTill anyChar (noneOf $ ['a'..'z']++['A'..'Z']++['0'..'9'])
+    firstChar <- letter <|> char '_'
+    lastChars <- many $ oneOf (['a'..'z']++['A'..'Z']++['0'..'9'])
     let name = [firstChar] ++ lastChars
     if (elem name reservedWords)
     then fail $ "cannot use reserved word " ++ name ++" as identifier" 
@@ -49,15 +49,21 @@ module MGC.Parser.Prim where
 
   literal = basicLit
 
-  basicLit = intLit -- <|> floatLit <|> runeLit <|> stringLit
+  basicLit = intLit
 
   intLit ::  Parser Expression
-  intLit = octLit
+  intLit = hexLit <|> octLit <|> decimalLit
 
   octLit ::  Parser Expression
-  octLit = do
+  octLit = try $ do
     char '0'
-    liftM (Integer . fst . head . readOct) (many octDigit)
+    liftM (Integer . fst . head . readOct) (many1 octDigit)
 
-  decimalLit :: Integral a => Parser a
-  decimalLit = liftM (fst . head . readDec) (many digit)
+  decimalLit :: Parser Expression
+  decimalLit = try $ liftM (Integer . fst . head . readDec) (many1 digit)
+
+  hexLit :: Parser Expression
+  hexLit = try $ do
+    char '0'
+    oneOf "xX"
+    liftM (Integer . fst . head . readHex) (many1 hexDigit)
