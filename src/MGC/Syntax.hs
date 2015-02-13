@@ -1,6 +1,6 @@
 module MGC.Syntax (
-  Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), BinOp(..), UOp(..),
-  Statement(..), ForCond(..), SwitchClause(..),
+  Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), 
+  BinOp(..), UOp(..), Statement(..), ForCond(..), SwitchClause(..),
   Type(..), Expression(..), MethodSpec(..), VarSpec(..)) where
 
   type Identifier = String
@@ -27,11 +27,12 @@ module MGC.Syntax (
    | TypeAssertion Type
    | Arguments [Expression]
    | Operand
-
+   | Integer Int
   data BinOp = Or | And 
     | Eq | NEq | LessThan | LessThanEq | GreaterThan | GreaterThanEq
-    | Plus | Minus | BinBitOr | BinBitXor
-    | Mult | Div | Mod | LShift | RShift | BinBitAnd | BinBitClear
+    | Plus | Minus | BitOr | BitXor
+    | Mult | Div | Mod | LShift | RShift | BitAnd | BitClear
+    
   data UOp = UnPlus | UnMinus | Not | BComp
 
   data Statement = Print
@@ -62,5 +63,5 @@ module MGC.Syntax (
     | Interface [MethodSpec] 
     | Slice Type 
     | Unit
-  
+
   data MethodSpec = MethodSpec Identifier Signature | InterfaceName Identifier
