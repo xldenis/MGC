@@ -4,6 +4,7 @@ module MGC.Parser.PrimSpec (spec) where
   import MGC.Parser.Prim
   import Text.Parsec
   import MGC.Syntax
+  import Control.Applicative ((<*))
   spec :: Spec
   spec = do
     describe "literal" $ do
@@ -20,10 +21,12 @@ module MGC.Parser.PrimSpec (spec) where
           intLit `parses` "0X15" `to` (Integer 21)
         it "parses decimal 0" $ do
           intLit `parses` "0" `to` (Integer 0)
+        it "eats whitespace" $ do
+          (intLit <* eof) `parses` "0 " `to` (Integer 0)
     describe "identifier" $ do
       it "recognizes strings" $ do
-        identifier `parses` "akadjfkadjfkl " `to` ("akadjfkadjfkl")
+        identifier `parses` "akadjfkadjfkl" `to` ("akadjfkadjfkl")
       it "accepts _ as a leading char" $ do
-        identifier `parses` "_test " `to` ("_test")
+        identifier `parses` "_test" `to` ("_test")
       it "doesnt allow reserved words" $ do
         identifier `wontParse` "var"

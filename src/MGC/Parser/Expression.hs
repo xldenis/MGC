@@ -3,7 +3,7 @@ module MGC.Parser.Expression  where
   import Text.Parsec.String
   import Text.Parsec
 
-  import Control.Applicative ((<$>), (<*), (<*>))
+  import Control.Applicative ((<$>), (<*), (*>), (<*>))
   import Control.Monad ((>>), liftM2, liftM)
 
   import MGC.Syntax
@@ -16,14 +16,24 @@ module MGC.Parser.Expression  where
   unaryOps = ["+", "-", "!", "^"]
 
 
-  table = [ (map (\(s,tp) -> binary s tp AssocRight) relOps) ]
+  table = [
+     (map (\(s,tp) -> binary s tp AssocLeft) mulOps)
+   , (map (\(s,tp) -> binary s tp AssocLeft) addOps)
+   , (map (\(s,tp) -> binary s tp AssocLeft) relOps)
+   , [binary "&&" (And) AssocLeft]
+   , [binary "||" (Or)  AssocLeft]
+   ]
 
   binary n fun assoc = Infix (do{ op n; return $ BinaryOp fun; }) assoc
   prefix n fun = Prefix (do{op n; return $ UnaryOp fun;})
   postfix n fun = Postfix (do{op n; return $ UnaryOp fun;})
 
-  op :: String -> Parsec String u ()
-  op s = string s   >> return ()
+  opLetter :: [Char]
+  opLetter = "+-/%*=!<>|&^"
+
+
+  op :: String -> Parser ()
+  op s = try $ string s >> notFollowedBy (oneOf opLetter) >> lineSpace
 
   expression :: Parser Expression
   expression = buildExpressionParser table primaryExpr <?> "Expression"
@@ -44,8 +54,14 @@ module MGC.Parser.Expression  where
   index = try $ liftM Index (brackets expression)
 
   slice :: Parser Expression
-  slice = try $ brackets expression 
-
+  slice = try $ brackets $ do 
+    e1 <- expression 
+    lexeme ":"
+    e2 <- expression
+    a <- optionMaybe (lexeme ":" *> expression)
+    case a of
+      Just e3 -> return $ FullSlice e1 e2 e3
+      Nothing -> return $ SimpleSlice e1 e2
   --typeAssertion :: Parser Expression
   --typeAssertion  = char '.' >> parens typeParser
 

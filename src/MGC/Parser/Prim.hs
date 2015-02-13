@@ -1,7 +1,8 @@
 module MGC.Parser.Prim where
   import Text.Parsec
   import Text.Parsec.String
-
+  import Data.Char 
+  
   import Numeric
   import Control.Applicative ((<*), (*>))
   import Control.Monad (liftM, (>>))
@@ -13,30 +14,33 @@ module MGC.Parser.Prim where
     "if", "import", "int", "interface", "map", "package", "print", "println",
     "range", "return", "rune", "select", "string", "struct", "switch", "type", "var" ]
 
-  parens :: Parsec String u a -> Parsec String u a
+  parens :: Parser a -> Parser a
   parens = between (char '(') (char ')')
   
-  brackets :: Parsec String u a -> Parsec String u a
+  brackets :: Parser a -> Parser a
   brackets = between (char '[') (char ']')
 
-  braces :: Parsec String u a -> Parsec String u a
+  braces :: Parser a -> Parser a
   braces = between (char '{') (char '}')
 
   semi = lexeme' ";"
 
-  lexeme :: String -> Parsec String u String
-  lexeme s = string s <* (many (oneOf "\t\f\v"))
-  lexeme' :: String -> Parsec String u String -- currently the same as lexeme. Needs to change so that it consumes \n\r
+  lexeme :: String -> Parser String
+  lexeme s = string s <* lineSpace
+  lexeme' :: String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
   lexeme' s = string s <* (many spaces)
 
-  reserved :: String -> Parsec String u String
+  lineSpace :: Parser ()
+  lineSpace = try $ many (satisfy (\x -> isSpace x && not (x == '\n' || x == '\r'))) >> return ()
+
+  reserved :: String -> Parser String
   reserved s = try $ do
     name <- lexeme s
     if (elem name reservedWords)
     then return $ name
     else fail $  name ++"is not a reserved word" 
 
-  identifier :: Parsec String u Identifier
+  identifier :: Parser Identifier
   identifier = try $ do
     firstChar <- letter <|> char '_'
     lastChars <- many $ oneOf (['a'..'z']++['A'..'Z']++['0'..'9'])
@@ -52,7 +56,7 @@ module MGC.Parser.Prim where
   basicLit = intLit
 
   intLit ::  Parser Expression
-  intLit = hexLit <|> octLit <|> decimalLit
+  intLit = (hexLit <|> octLit <|> decimalLit) <* lineSpace
 
   octLit ::  Parser Expression
   octLit = try $ do

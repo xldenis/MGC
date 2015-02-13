@@ -23,11 +23,13 @@ module MGC.Syntax (
    | Conversion Type Expression
    | Selector Expression Identifier
    | Index Expression
-   | SliceExpr Expression Expression
+   | SimpleSlice Expression Expression
+   | FullSlice Expression Expression Expression
    | TypeAssertion Type
    | Arguments [Expression]
    | Operand
    | Integer Int  deriving (Show, Eq)
+
   data BinOp = Or | And 
     | Eq | NEq | LessThan | LessThanEq | GreaterThan | GreaterThanEq
     | Plus | Minus | BitOr | BitXor

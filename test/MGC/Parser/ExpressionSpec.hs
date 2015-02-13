@@ -8,7 +8,9 @@ module MGC.Parser.ExpressionSpec (spec) where
   spec = do
     describe "expression" $ do
       it "parses full expression" $ do
-        pending
+        expression `parses` "0==0" `to` (BinaryOp Eq (Integer 0) (Integer 0))
+        expression `parses` "0 == 0 " `to` (BinaryOp Eq (Integer 0) (Integer 0))
+        expression `parses` "0&&0" `to` (BinaryOp And (Integer 0) (Integer 0))
     describe "expression Term" $ do
       it "parses literals" $ do
         pending
