@@ -7,7 +7,6 @@ module MGC.Parser where
 
   import Text.Parsec (try, many, sepEndBy, Parsec)
   import Text.Parsec.String
-  --import Text.Parsec.Char (letter, char, digit, string, oneOf, satisfy, space, noneOf, anyChar)
   import Text.Parsec.Char
   import Text.Parsec.Combinator
   import Control.Applicative ((<$>), (<*>), (<*), (*>), (<|>))
@@ -84,21 +83,21 @@ module MGC.Parser where
     return $ Switch stmt expr clauses
 
   exprCaseClause :: Parser SwitchClause
-  exprCaseClause = do
-    caseType <- lexeme "case" >> (Just <$> expressionList <|> (lexeme "default" >> return Nothing))
-    lexeme ":"
-    stmts <- statement `sepEndBy` semi
-    return $ Case caseType stmts
+  exprCaseClause = try $ do
+    caseType <- (lexeme "case" >> Just <$> expressionList) <|> (lexeme "default" >> return Nothing)
+    lexeme' ":"
+    stmts <- statement `sepEndBy` semi'
+    return $ (caseType, stmts)
 
   forStmt :: Parser Statement
   forStmt = do
     reserved "for"
-    cond <- (Condition <$> expression) <|> forClause
+    cond <- optionMaybe $ forClause <|> (try $ Condition <$> expression)
     body <- blockStmt
     return $ For cond body
 
   forClause :: Parser ForCond
-  forClause = do
+  forClause = try $ do
     initStmt <- simpleStatement
     semi
     cond <- expression
@@ -118,7 +117,7 @@ module MGC.Parser where
   incDec :: Parser Statement
   incDec = try $ do
     e <- expression
-    (string "++" *> (return $ Inc e)) <|> (string "--" *> (return $ Dec e))
+    (lexeme "++" *> (return $ Inc e)) <|> (lexeme "--" *> (return $ Dec e))
 
   assign :: Parser Statement
   assign = try $ do
@@ -137,6 +136,7 @@ module MGC.Parser where
   shortDec :: Parser Statement
   shortDec = try $ do
     idents <- identifierList
+    lexeme ":="
     exprs  <- expressionList
     if (length idents == length exprs)
     then return $ ShortDecl idents exprs

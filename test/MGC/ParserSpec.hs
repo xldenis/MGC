@@ -12,7 +12,7 @@ module MGC.ParserSpec (spec) where
           pending
       it "parses functions" $ do
         pending
-    
+
     describe "typeDec" $ do
       it "parses single types" $ do
         typeDec `parses` "type IntArray [16]int" ~> TypeDecl [("IntArray", Array (Integer 16) (TInteger))]
@@ -31,11 +31,9 @@ module MGC.ParserSpec (spec) where
       it "works with one branch" $ do
         ifStmt `parses` "if 0 {1++}" ~> (If (Nothing) (Integer 0) (Block [Inc (Integer 1)]) Empty)
       it "works with simpleStatements" $ do
-        pending
-      it "works with no statement / expression" $ do
-        pending
+        ifStmt `parses` "if 0; 0 {1}" ~> (If (Just (ExpressionStmt (Integer 0))) (Integer 0) (Block [ExpressionStmt (Integer 1)]) Empty)
       it "works with else branch" $ do
-        pending
+        ifStmt `parses` "if 0 {1}else{0}" ~> (If Nothing (Integer 0) (Block [(ExpressionStmt (Integer 1))]) (Block [(ExpressionStmt (Integer 0))]))
       it "works with else if branch" $ do
         pending
 
@@ -51,11 +49,12 @@ module MGC.ParserSpec (spec) where
 
     describe "for" $ do
       it "works with infinite loop" $ do
-        pending
+        forStmt `parses` "for {}" ~> (For Nothing (Block []))
       it "works with standard for clauses" $ do
-        pending
+        forStmt `parses` "for x = 0; x<10; x++ {}" ~> (For (Just $ ForClause (Assignment Eq [(Name "x")] [(Integer 0)]) (BinaryOp LessThan (Name "x") (Integer 10)) (Inc $ Name "x")) (Block []))
       it "works with expression loops" $ do
-        pending
+        forStmt `parses` "for x<y {}" ~> (For (Just $ Condition (BinaryOp LessThan (Name "x") (Name "y"))) (Block []))
+        
 
     describe "shortDec" $ do
       it "parses single lhs & rhs" $ do
@@ -67,21 +66,19 @@ module MGC.ParserSpec (spec) where
 
     describe "switch" $ do
       it "parses expression switches" $ do
-        pending
+        switchStmt `parses` "switch 0 {\ndefault:\n1}" ~> (Switch Nothing (Just (Integer 0)) [(Nothing, [ExpressionStmt (Integer 1)])])
       it "parses empty switches" $ do
-        pending
+        switchStmt `parses` "switch {}" ~> (Switch Nothing Nothing [])
       it "parses statement switches" $ do
-        pending
+        switchStmt `parses` "switch 0; {}" ~> (Switch (Just (ExpressionStmt (Integer 0))) Nothing [])
       it "parses expression & statement switches" $ do
-        pending
+        switchStmt `parses` "switch 0; 0 {\n}" ~> (Switch (Just (ExpressionStmt (Integer 0))) (Just (Integer 0)) [])
 
     describe "function declarations" $ do
       it "parses function signatures" $ do
         pending
       it "parses full functions" $ do
         pending
-
-
 
     describe "simpleStatement" $ do
       it "parses expressions" $ do
@@ -93,7 +90,7 @@ module MGC.ParserSpec (spec) where
       it "parses assignment" $ do
         simpleStatement `parses` "test = 5" ~> (Assignment Eq [(Name "test")] [(Integer 5)])
       it "parses short declarations" $ do
-        pending
+        shortDec `parses` "test := 5" ~> (ShortDecl [("test")] [(Integer 5)])
 
     describe "incDec" $ do
       it "parses 0++" $ do

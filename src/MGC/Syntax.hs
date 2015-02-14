@@ -45,7 +45,7 @@ module MGC.Syntax (
     | Return [Expression]
     | If (Maybe Statement) Expression Statement Statement
     | Switch (Maybe Statement) (Maybe Expression) [SwitchClause]
-    | For ForCond Statement
+    | For (Maybe ForCond) Statement
     | Continue
     | Break
     | Block [Statement]
@@ -58,7 +58,7 @@ module MGC.Syntax (
 
   data ForCond = Condition Expression | ForClause Statement Expression Statement  deriving (Show, Eq)
 
-  data SwitchClause = Case (Maybe [Expression]) [Statement]  deriving (Show, Eq)
+  type SwitchClause = (Maybe [Expression], [Statement])
 
   data Type = TypeName Identifier 
     | QualTypeName Identifier Identifier
