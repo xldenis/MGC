@@ -59,7 +59,7 @@ module MGC.Parser where
     else fail $ "assign a value to every variable"
 
   statement :: Parser Statement
-  statement = returnStmt <|> ifStmt <|> switchStmt <|> forStmt <|> blockStmt
+  statement = simpleStatement <|> returnStmt <|> ifStmt <|> switchStmt <|> forStmt <|> blockStmt 
 
   returnStmt :: Parser Statement
   returnStmt = do
@@ -69,7 +69,7 @@ module MGC.Parser where
   ifStmt :: Parser Statement
   ifStmt = do
     reserved "if"  
-    stmt <- optionMaybe simpleStatement 
+    stmt <- optionMaybe (try $ simpleStatement <* semi)
     expr <- expression
     left <- blockStmt
     right <- reserved "else" >> (ifStmt <|> blockStmt)
@@ -78,7 +78,7 @@ module MGC.Parser where
   switchStmt :: Parser Statement
   switchStmt = do
     reserved "switch"
-    stmt <- optionMaybe $ simpleStatement <* semi
+    stmt <- optionMaybe $ try $ simpleStatement <* (semi)
     expr <- optionMaybe expression
     clauses <- braces (many exprCaseClause) 
     return $ Switch stmt expr clauses
@@ -107,13 +107,13 @@ module MGC.Parser where
     return $ ForClause initStmt cond postStmt
 
   blockStmt :: Parser Statement
-  blockStmt = Block <$> (braces $ statement `sepEndBy` semi)
+  blockStmt = Block <$> (braces $ statement `sepEndBy` (semi <|> spaces))
 
   simpleStatement :: Parser Statement
-  simpleStatement = incDec <|> assign <|> opAssign <|> shortDec <|> exprStmt
+  simpleStatement = try $ incDec <|> assign <|> opAssign <|> shortDec <|> exprStmt
   
   exprStmt :: Parser Statement
-  exprStmt = ExpressionStmt <$> expression
+  exprStmt = try $ ExpressionStmt <$> expression
 
   incDec :: Parser Statement
   incDec = try $ do
@@ -137,7 +137,7 @@ module MGC.Parser where
   shortDec :: Parser Statement
   shortDec = try $ do
     idents <- identifierList
-    exprs <- expressionList
+    exprs  <- expressionList
     if (length idents == length exprs)
     then return $ ShortDecl idents exprs
     else fail $ "left and right side of assign must match length"

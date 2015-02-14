@@ -23,7 +23,7 @@ module MGC.Parser.Prim where
   brackets = between (char '[') (char ']')
 
   braces :: Parser a -> Parser a
-  braces = between (char '{') (char '}')
+  braces = between (lexeme' "{") (lexeme' "}")
 
   quotes :: Parser a -> Parser a
   quotes = between (char '"') (char '"')
@@ -33,12 +33,13 @@ module MGC.Parser.Prim where
 
   ticks :: Parser a -> Parser a
   ticks = between (char '`') (char '`')
-  semi = lexeme' ";"
 
+  semi = lexeme ";" >> return ()
+  semi' = lexeme' ";" >> return ()
   lexeme :: String -> Parser String
-  lexeme s = string s <* lineSpace
+  lexeme s = try $ string s <* lineSpace
   lexeme' :: String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
-  lexeme' s = string s <* spaces
+  lexeme' s = try $ string s <* (try spaces)
 
   lineSpace :: Parser ()
   lineSpace = try $ many (satisfy (\x -> isSpace x && not (x == '\n' || x == '\r'))) >> return ()
@@ -66,7 +67,7 @@ module MGC.Parser.Prim where
     then fail $ "cannot use reserved word " ++ word ++" as identifier" 
     else return $ word  
 
-  identifierList = identifier `sepEndBy` (lexeme ",")
+  identifierList = identifier `sepEndBy1` (lexeme ",")
 
   literal = basicLit
 

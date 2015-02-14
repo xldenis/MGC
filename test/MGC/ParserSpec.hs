@@ -19,6 +19,16 @@ module MGC.ParserSpec (spec) where
         pending
       it "doesnt require a semi colon at the end" $ do
         pending
+    describe "block statement" $ do
+      it "allows semi colons" $ do
+        blockStmt `parses` "{\n0++;1++\n2++}\n" ~> (Block [(Inc $ Integer 0), (Inc $ Integer 1), (Inc $ Integer 2)])
+      it "allows statements" $ do
+        blockStmt `parses` "{0++}" ~> (Block [(Inc $ Integer 0)])
+
+    describe "if statement" $ do
+      it "works with one branch" $ do
+        pending
+        --ifStmt `parses` "if 0 {1++}" ~> (If (Nothing) (Integer 0) (Block [Inc (Integer 0)]) Empty)
 
     describe "simpleStatement" $ do
       it "parses expressions" $ do
