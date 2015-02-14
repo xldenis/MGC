@@ -29,6 +29,7 @@ module MGC.Syntax (
    | Arguments [Expression]
    | Operand
    | Integer Int  
+   | Rune Char
    | String String deriving (Show, Eq)
 
   data BinOp = Or | And 

@@ -22,8 +22,13 @@ module MGC.Parser.Prim where
 
   braces :: Parser a -> Parser a
   braces = between (char '{') (char '}')
+
   quotes :: Parser a -> Parser a
   quotes = between (char '"') (char '"')
+
+  quotes' :: Parser a -> Parser a
+  quotes' = between (char '\'') (char '\'')
+
   ticks :: Parser a -> Parser a
   ticks = between (char '`') (char '`')
   semi = lexeme' ";"
@@ -58,6 +63,16 @@ module MGC.Parser.Prim where
 
   basicLit = intLit <|> stringLit
 
+  runeLit :: Parser Expression
+  runeLit = Rune <$> quotes' (byteLit <|> anyChar)
+
+  byteLit :: Parser Char
+  byteLit = try $ do
+    char '\\'
+    chars <-  (((:) <$> char 'x' <*> count 2 hexDigit)) <|>(count 3 octDigit)
+    return $ (fst . head . readLitChar) ('\\':chars)
+
+  stringLit :: Parser Expression
   stringLit = String <$> (quotes (interpretedString) <|> ticks (many anyChar))
 
   interpretedString :: Parser String

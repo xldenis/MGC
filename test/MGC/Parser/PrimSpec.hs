@@ -31,7 +31,15 @@ module MGC.Parser.PrimSpec (spec) where
         it "parses unicode literals" $ do
           stringLit `parses` "\"\\u0000\"" `to` (String "\0000")
         it "parses escape sequences" $ do
-          pending
+          stringLit `parses` "\" \\n \\r \\t \\a \\' \\\" \"" `to` (String " \n \r \t \a \' \" ")
+      describe "runes" $ do
+        it "recognizes normal chars" $ do
+          runeLit `parses` "'a'" `to` (Rune 'a')
+        it "recognizes octal bytes" $ do
+          runeLit `parses` "'\\000'" `to` (Rune '\000')
+        it "recognizes hex bytes" $ do
+          runeLit `parses` "'\\x00'" `to` (Rune '\x00')
+
     describe "identifier" $ do
       it "recognizes strings" $ do
         identifier `parses` "akadjfkadjfkl" `to` ("akadjfkadjfkl")
