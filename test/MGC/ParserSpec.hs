@@ -27,8 +27,26 @@ module MGC.ParserSpec (spec) where
 
     describe "if statement" $ do
       it "works with one branch" $ do
+        ifStmt `parses` "if 0 {1++}" ~> (If (Nothing) (Integer 0) (Block [Inc (Integer 1)]) Empty)
+      it "works with simpleStatements" $ do
         pending
-        --ifStmt `parses` "if 0 {1++}" ~> (If (Nothing) (Integer 0) (Block [Inc (Integer 0)]) Empty)
+      it "works with no statement / expression" $ do
+        pending
+      it "works with else branch" $ do
+        pending
+      it "works with else if branch" $ do
+        pending
+
+    describe "return" $ do
+      it "returns" $ do
+        returnStmt `parses` "return" ~> (Return [])
+      it "returns w expressions" $ do
+        returnStmt `parses` "return 0" ~> (Return [Integer 0])
+      it "returns w semicolons" $ do
+        returnStmt `parses` "return;" ~> (Return [])
+      it "eats new lines" $ do
+        returnStmt `parses` "return\n" ~> (Return [])
+    
 
     describe "simpleStatement" $ do
       it "parses expressions" $ do

@@ -46,4 +46,5 @@ test-suite tests
                       parsec >= 3.0,
                       hspec,
                       hspec-expectations,
-                      mgc
+                      mgc,
+                      neat-interpolation
