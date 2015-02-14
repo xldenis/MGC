@@ -12,6 +12,7 @@ module MGC.ParserSpec (spec) where
           pending
       it "parses functions" $ do
         pending
+    
     describe "typeDec" $ do
       it "parses single types" $ do
         typeDec `parses` "type IntArray [16]int" ~> TypeDecl [("IntArray", Array (Integer 16) (TInteger))]
@@ -19,6 +20,7 @@ module MGC.ParserSpec (spec) where
         pending
       it "doesnt require a semi colon at the end" $ do
         pending
+
     describe "block statement" $ do
       it "allows semi colons" $ do
         blockStmt `parses` "{\n0++;1++\n2++}\n" ~> (Block [(Inc $ Integer 0), (Inc $ Integer 1), (Inc $ Integer 2)])
@@ -46,7 +48,40 @@ module MGC.ParserSpec (spec) where
         returnStmt `parses` "return;" ~> (Return [])
       it "eats new lines" $ do
         returnStmt `parses` "return\n" ~> (Return [])
-    
+
+    describe "for" $ do
+      it "works with infinite loop" $ do
+        pending
+      it "works with standard for clauses" $ do
+        pending
+      it "works with expression loops" $ do
+        pending
+
+    describe "shortDec" $ do
+      it "parses single lhs & rhs" $ do
+        pending
+      it "parses empty idents" $ do
+        pending
+      it "parses complex lhs & rhs" $ do
+        pending
+
+    describe "switch" $ do
+      it "parses expression switches" $ do
+        pending
+      it "parses empty switches" $ do
+        pending
+      it "parses statement switches" $ do
+        pending
+      it "parses expression & statement switches" $ do
+        pending
+
+    describe "function declarations" $ do
+      it "parses function signatures" $ do
+        pending
+      it "parses full functions" $ do
+        pending
+
+
 
     describe "simpleStatement" $ do
       it "parses expressions" $ do
