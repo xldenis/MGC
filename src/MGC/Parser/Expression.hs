@@ -44,8 +44,10 @@ module MGC.Parser.Expression  where
   primaryExpr = (operand) <* lineSpace
 
   operand :: Parser Expression
-  operand = literal <|> (parens expression)
+  operand = literal <|> name <|> (parens expression)
 
+  name :: Parser Expression
+  name = (Name <$> identifier) <|> (QualName <$> identifier <*> identifier)
   --conversion :: Parser Expression
   --conversion = liftM2 typeParser (parens $ expression <* optional lexeme "," )
 

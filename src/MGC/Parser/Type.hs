@@ -1,4 +1,4 @@
-module MGC.Parser.Type (typeParser, signature) where
+module MGC.Parser.Type  where
   import MGC.Syntax (Type(..), MethodSpec(..), Signature(..))
   import MGC.Parser.Prim
   import MGC.Parser.Expression
@@ -9,19 +9,22 @@ module MGC.Parser.Type (typeParser, signature) where
   import Control.Applicative ((<$>), (<*>), (<*), (*>))
   
   typeParser :: Parser Type
-  typeParser = typeName <|> typeLit <|> (parens typeParser)
+  typeParser = typeLit <|> typeName <|> (parens typeParser)
 
   typeName :: Parser Type
-  typeName = Name <$> identifier
+  typeName = TypeName <$> reservedType
 
   typeLit :: Parser Type
-  typeLit = arrayType <|> structType <|> pointerType <|> functionType <|> interfaceType <|> sliceType
+  typeLit = builtins <|> arrayType <|> functionType <|> interfaceType <|> sliceType
 
   arrayType :: Parser Type
   arrayType = Array <$> (brackets expression) <*> typeParser
 
   sliceType :: Parser Type
-  sliceType = do{char '[';char ']'; tp <- typeParser; return $ Slice tp }
+  sliceType = try $ do{char '[';char ']'; tp <- typeParser; return $ Slice tp }
+
+  builtins :: Parser Type
+  builtins = (string "int" *> return TInteger) <|> (string "float64" *> return TFloat) <|> (string "rune" *> return TRune) <|> (string "string" *> return TString)
 
   structType :: Parser Type
   structType = do {return Struct}
@@ -33,17 +36,17 @@ module MGC.Parser.Type (typeParser, signature) where
   --  many identifier <* (char ",") <|> 
 
   pointerType :: Parser Type
-  pointerType = do 
+  pointerType = try $ do 
     char '*'
     Pointer <$> typeParser
 
   functionType :: Parser Type
-  functionType = do
+  functionType = try $ do
     lexeme "func"
     Function <$> signature
 
   interfaceType :: Parser Type
-  interfaceType = do
+  interfaceType = try $ do
     lexeme "interface"
     Interface <$> (braces $ many (methodSpec <* semi))
 

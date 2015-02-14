@@ -8,31 +8,31 @@ module MGC.Parser.ExpressionSpec (spec) where
   spec = do
     describe "expression" $ do
       it "parses arithmetic expression" $ do
-        expression `parses` "0==0" `to` (BinaryOp Eq (Integer 0) (Integer 0))
-        expression `parses` "0 == 0 " `to` (BinaryOp Eq (Integer 0) (Integer 0))
-        expression `parses` "0&&0" `to` (BinaryOp And (Integer 0) (Integer 0))
+        expression `parses` "0==0" ~> (BinaryOp Eq (Integer 0) (Integer 0))
+        expression `parses` "0 == 0 " ~> (BinaryOp Eq (Integer 0) (Integer 0))
+        expression `parses` "0&&0" ~> (BinaryOp And (Integer 0) (Integer 0))
       it "parses complex expressions" $ do
-        expression `parses` "(0+1).count ^ 0x5" `to` (BinaryOp BitXor (Selector (BinaryOp Plus (Integer 0) $ Integer 1) "count") (Integer 5))
+        expression `parses` "(0+1).count ^ 0x5" ~> (BinaryOp BitXor (Selector (BinaryOp Plus (Integer 0) $ Integer 1) "count") (Integer 5))
       it "parses different precedences" $ do 
-        expression `parses` "0+1^ 2" `to` (BinaryOp BitXor (BinaryOp Plus (Integer 0) (Integer 1)) (Integer 2))
+        expression `parses` "0+1^ 2" ~> (BinaryOp BitXor (BinaryOp Plus (Integer 0) (Integer 1)) (Integer 2))
       it "handles parens" $ do
-        expression `parses` "(0+1) + 1" `to` BinaryOp Plus (BinaryOp Plus (Integer 0) $ Integer 1) (Integer 1)
+        expression `parses` "(0+1) + 1" ~> BinaryOp Plus (BinaryOp Plus (Integer 0) $ Integer 1) (Integer 1)
       it "parses array indices" $ do
-        expression `parses` "0[0]" `to` (Index (Integer 0) (Integer 0))
+        expression `parses` "0[0]" ~> (Index (Integer 0) (Integer 0))
     describe "expression Term" $ do
       it "parses literals" $ do
-        parse primaryExpr "" "0x15" `to` (Integer 21)
+        parse primaryExpr "" "0x15" ~> (Integer 21)
     describe "operand" $ do
       it "parses literals" $ do
-        operand `parses` "0X15" `to` (Integer 21)
-        operand `parses` "\"asasdasdadsd\\n\"" `to` (String "asasdasdadsd\n")
+        operand `parses` "0X15" ~> (Integer 21)
+        operand `parses` "\"asasdasdadsd\\n\"" ~> (String "asasdasdadsd\n")
       it "allows parens" $ do
-        operand `parses` "(0)" `to` Integer 0
+        operand `parses` "(0)" ~> Integer 0
     describe "slice" $ do
       it "parses constant indices" $ do
         pending
     describe "selector" $ do
       it "parses `(0).method`" $ do
-        expression `parses` "(0).method " `to` Selector (Integer 0) "method"
+        expression `parses` "(0).method " ~> Selector (Integer 0) "method"
       it "parses (0+1).method" $ do
-        expression `parses` "(0+1).method " `to` Selector (BinaryOp Plus (Integer 0) (Integer 1)) "method"
+        expression `parses` "(0+1).method " ~> Selector (BinaryOp Plus (Integer 0) (Integer 1)) "method"

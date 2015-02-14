@@ -24,7 +24,7 @@ module MGC.Parser where
   declaration = typeDec <|> varDec
 
   funcDec :: Parser TopLevelDeclaration
-  funcDec = do
+  funcDec = try $ do
     reserved "func"
     name <- identifier
     sig <- signature
@@ -33,7 +33,7 @@ module MGC.Parser where
     return $ FunctionDecl name sig body
     
   typeDec :: Parser TopLevelDeclaration
-  typeDec = do
+  typeDec = try $ do
     lexeme "type"
     TypeDecl <$> ( (flip (:) []) <$> typeSpec <|> (parens $ typeSpec `sepEndBy` semi))
 
@@ -41,11 +41,11 @@ module MGC.Parser where
   typeSpec =  (,) <$> identifier <*> typeParser
 
   varDec :: Parser TopLevelDeclaration
-  varDec = do
+  varDec = try $ do
     lexeme "var"
     VarDecl <$> (parens $ (varSpec `sepEndBy` semi))
 
-  varSpec = do
+  varSpec = try $ do
     idents <- identifierList
 
     tp <- (\x -> case x of
@@ -83,6 +83,7 @@ module MGC.Parser where
     clauses <- braces (many exprCaseClause) 
     return $ Switch stmt expr clauses
 
+  exprCaseClause :: Parser SwitchClause
   exprCaseClause = do
     caseType <- lexeme "case" >> (Just <$> expressionList <|> (lexeme "default" >> return Nothing))
     lexeme ":"
@@ -96,6 +97,7 @@ module MGC.Parser where
     body <- blockStmt
     return $ For cond body
 
+  forClause :: Parser ForCond
   forClause = do
     initStmt <- simpleStatement
     semi
@@ -108,22 +110,29 @@ module MGC.Parser where
   blockStmt = Block <$> (braces $ statement `sepEndBy` semi)
 
   simpleStatement :: Parser Statement
-  simpleStatement = exprStmt <|> incDec <|> assign <|> shortDec
+  simpleStatement = incDec <|> assign <|> opAssign <|> shortDec <|> exprStmt
   
   exprStmt :: Parser Statement
   exprStmt = ExpressionStmt <$> expression
 
   incDec :: Parser Statement
-  incDec = do
+  incDec = try $ do
     e <- expression
     (string "++" *> (return $ Inc e)) <|> (string "--" *> (return $ Dec e))
 
   assign :: Parser Statement
-  assign = do
+  assign = try $ do
     lhs <- expressionList
-    op <- (addOpParser <|> mulOpParser) <* lexeme "="
+    lexeme "=" -- wrong
     rhs <- expressionList
-    return $ Assignment op lhs rhs
+    return $ Assignment Eq lhs rhs
+
+  opAssign :: Parser Statement
+  opAssign = try $ do
+    lhs <- expression
+    op <- (addOpParser <|> mulOpParser) <* lexeme "=" -- wrong
+    rhs <- expression
+    return $ Assignment op [lhs] [rhs]
 
   shortDec :: Parser Statement
   shortDec = try $ do

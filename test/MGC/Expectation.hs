@@ -7,8 +7,8 @@ module MGC.Expectation where
   parses :: Parser a -> String -> Either ParseError a
   parses par str = parse par "" str
 
-  to :: (Show a, Eq a, Show b) => Either b a -> a -> Expectation 
-  to res want = case res of
+  (~>) :: (Show a, Eq a, Show b) => Either b a -> a -> Expectation 
+  res ~> want = case res of
       Right a -> unless (a == want) $ expectationFailure $ "got "++show a++" expected "++show want
       Left b -> expectationFailure $ show b
 

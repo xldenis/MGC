@@ -27,7 +27,8 @@ module MGC.Syntax (
    | FullSlice Expression Expression Expression
    | TypeAssertion Type
    | Arguments [Expression]
-   | Operand
+   | Name Identifier
+   | QualName Identifier Identifier
    | Integer Int  
    | Rune Char
    | String String deriving (Show, Eq)
@@ -59,13 +60,18 @@ module MGC.Syntax (
 
   data SwitchClause = Case (Maybe [Expression]) [Statement]  deriving (Show, Eq)
 
-  data Type = Name Identifier 
-    | QualName Identifier
+  data Type = TypeName Identifier 
+    | QualTypeName Identifier Identifier
     | Array Expression Type 
-    | Struct | Pointer Type 
+    | Struct 
+    | Pointer Type 
     | Function Signature
     | Interface [MethodSpec] 
     | Slice Type 
+    | TInteger
+    | TFloat
+    | TString
+    | TRune
     | Unit  deriving (Show, Eq)
 
   data MethodSpec = MethodSpec Identifier Signature | InterfaceName Identifier  deriving (Show, Eq)

@@ -14,6 +14,8 @@ module MGC.Parser.Prim where
     "if", "import", "int", "interface", "map", "package", "print", "println",
     "range", "return", "rune", "select", "string", "struct", "switch", "type", "var" ]
 
+  reservedTypes = [ "int", "interface", "float64", "bool", "int", "rune", "map", "chan", "func"]
+
   parens :: Parser a -> Parser a
   parens = between (char '(') (char ')')
   
@@ -57,11 +59,18 @@ module MGC.Parser.Prim where
     then fail $ "cannot use reserved word " ++ name ++" as identifier" 
     else return $ name
 
+  reservedType :: Parser Identifier
+  reservedType = try $ do
+    word <- (many1 $ (alphaNum)) <* lineSpace
+    if (elem word reservedWords) && not (elem word reservedTypes)
+    then fail $ "cannot use reserved word " ++ word ++" as identifier" 
+    else return $ word  
+
   identifierList = identifier `sepEndBy` (lexeme ",")
 
   literal = basicLit
 
-  basicLit = intLit <|> stringLit
+  basicLit = intLit <|> stringLit <|> runeLit
 
   runeLit :: Parser Expression
   runeLit = Rune <$> quotes' (byteLit <|> anyChar)
