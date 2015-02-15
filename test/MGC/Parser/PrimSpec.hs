@@ -27,7 +27,7 @@ module MGC.Parser.PrimSpec (spec) where
         it "parses interpreted strings" $ do
           pending
         it "parses literal strings" $ do
-          pending
+          stringLit `parses` "`test`" ~> (String "test")
         it "parses unicode literals" $ do
           stringLit `parses` "\"\\u0000\"" ~> (String "\0000")
         it "parses escape sequences" $ do

@@ -88,10 +88,10 @@ module MGC.Parser.Prim where
     return $ (fst . head . readLitChar) ('\\':chars)
 
   stringLit :: Parser Expression
-  stringLit = try $ String <$> (quotes (interpretedString) <|> ticks (many anyChar))
+  stringLit = try $ String <$> (quotes (interpretedString) <|> (try $ ticks (many (noneOf "`"))))
 
   interpretedString :: Parser String
-  interpretedString = many $ unicodeEscape <|> escapeSeq <|> (noneOf "\n\"")
+  interpretedString = try $ many $ unicodeEscape <|> escapeSeq <|> (noneOf "\n\"")
 
   unicodeEscape :: Parser Char
   unicodeEscape = try $ do

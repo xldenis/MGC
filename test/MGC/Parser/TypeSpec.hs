@@ -27,12 +27,12 @@ module MGC.Parser.TypeSpec (spec) where
         it "parses complex structs" $ do
           let test = [string| 
             struct {
-              x, y int
+              x, y int "test"
               u float32
               _ float32
               A []int
               F func()
             }
           |]
-          let expected = Struct [NamedField ["x","y"] TInteger Nothing,NamedField ["u"] (TypeName "float32") Nothing,NamedField ["_"] (TypeName "float32") Nothing,NamedField ["A"] (Slice TInteger) Nothing,NamedField ["F"] (Function (Signature [] [])) Nothing]
+          let expected = Struct [NamedField ["x","y"] TInteger (Just $ String "test"),NamedField ["u"] (TypeName "float32") Nothing,NamedField ["_"] (TypeName "float32") Nothing,NamedField ["A"] (Slice TInteger) Nothing,NamedField ["F"] (Function (Signature [] [])) Nothing]
           typeParser `parses` test ~> expected
