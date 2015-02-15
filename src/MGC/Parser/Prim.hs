@@ -17,8 +17,11 @@ module MGC.Parser.Prim where
   reservedTypes = [ "int", "interface", "float64", "bool", "int", "rune", "map", "chan", "func"]
 
   parens :: Parser a -> Parser a
-  parens = between (char '(') (char ')')
+  parens = between (lexeme "(") (lexeme ")")
   
+  parens' :: Parser a -> Parser a
+  parens' = between (lexeme' "(") (lexeme' ")")
+
   brackets :: Parser a -> Parser a
   brackets = between (char '[') (char ']')
 
@@ -35,9 +38,11 @@ module MGC.Parser.Prim where
   ticks = between (char '`') (char '`')
 
   semi = lexeme ";" >> return ()
-  semi' = lexeme' ";" >> return ()
+  semi' = (lexeme' ";" >> return ()) <|> spaces
+
   lexeme :: String -> Parser String
   lexeme s = try $ string s <* lineSpace
+
   lexeme' :: String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
   lexeme' s = try $ string s <* (try spaces)
 

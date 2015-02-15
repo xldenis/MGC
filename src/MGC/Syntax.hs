@@ -12,7 +12,7 @@ module MGC.Syntax (
     | TypeDecl [(Identifier, Type)] 
     | VarDecl [VarSpec] deriving (Show, Eq)
 
-  data Signature = Signature Parameters (Maybe Parameters) deriving (Show, Eq)
+  data Signature = Signature Parameters  Parameters deriving (Show, Eq)
 
   type Parameters = [([Identifier], Type)]
 
@@ -72,6 +72,7 @@ module MGC.Syntax (
     | TFloat
     | TString
     | TRune
+    | TBool
     | Unit  deriving (Show, Eq)
 
   data MethodSpec = MethodSpec Identifier Signature | InterfaceName Identifier  deriving (Show, Eq)

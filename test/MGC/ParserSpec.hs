@@ -1,4 +1,6 @@
+{-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
 module MGC.ParserSpec (spec) where
+  import NeatInterpolation
   import MGC.Expectation
   import MGC.Parser
   import MGC.Syntax
@@ -17,9 +19,15 @@ module MGC.ParserSpec (spec) where
       it "parses single types" $ do
         typeDec `parses` "type IntArray [16]int" ~> TypeDecl [("IntArray", Array (Integer 16) (TInteger))]
       it "parses multi-type delcarations" $ do
-        pending
-      it "doesnt require a semi colon at the end" $ do
-        pending
+        typeDec `parses` "type ( Polar Point; IntArray [16]int)" ~> TypeDecl [("Polar", (TypeName "Point")), ("IntArray", Array (Integer 16) (TInteger))]
+      it "parses multi-line types" $ do
+        let test = [string|
+          type (
+            Polar Point
+            IntArray [16]int
+          )
+        |]
+        typeDec `parses` test ~> TypeDecl [("Polar", (TypeName "Point")), ("IntArray", Array (Integer 16) (TInteger))]
 
     describe "block statement" $ do
       it "allows semi colons" $ do
@@ -58,11 +66,11 @@ module MGC.ParserSpec (spec) where
 
     describe "shortDec" $ do
       it "parses single lhs & rhs" $ do
-        pending
+        shortDec `parses` "test := x" ~> (ShortDecl [("test")] [(Name "x")])
       it "parses empty idents" $ do
-        pending
+        shortDec `parses` "_ := wtf" ~> (ShortDecl [("_")] [(Name "wtf")])
       it "parses complex lhs & rhs" $ do
-        pending
+        shortDec `parses` "a,b , c := a" ~> (ShortDecl ["a", "b", "c"] [(Name "a")])  
 
     describe "switch" $ do
       it "parses expression switches" $ do
@@ -76,9 +84,17 @@ module MGC.ParserSpec (spec) where
 
     describe "function declarations" $ do
       it "parses function signatures" $ do
-        pending
+        funcDec `parses` "func flushICache(begin, end uintptr)" ~> (FunctionDecl "flushICache" (Signature [(["begin", "end"], (TypeName "uintptr"))] [])  Nothing)
+      it "parses func x(int) int" $ do
+        funcDec `parses` "func x(int) int " ~> FunctionDecl "x" (Signature [([], TInteger)] [([], TInteger)]) Nothing
       it "parses full functions" $ do
-        pending
+        let test = [string|
+          func x(y int) bool {
+            y++
+          }
+        |]
+        let expected = FunctionDecl "x" (Signature [(["y"], TInteger)] [([], TBool)]) (Just $ Block [Inc (Name "y")])
+        funcDec `parses` test ~> expected
 
     describe "simpleStatement" $ do
       it "parses expressions" $ do

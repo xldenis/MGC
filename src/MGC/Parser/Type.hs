@@ -24,7 +24,7 @@ module MGC.Parser.Type  where
   sliceType = try $ do{char '[';char ']'; tp <- typeParser; return $ Slice tp }
 
   builtins :: Parser Type
-  builtins = (string "int" *> return TInteger) <|> (string "float64" *> return TFloat) <|> (string "rune" *> return TRune) <|> (string "string" *> return TString)
+  builtins = (string "int" *> return TInteger) <|> (string "float64" *> return TFloat) <|> (string "rune" *> return TRune) <|> (string "string" *> return TString) <|> (string "bool" *> return TBool)
 
   structType :: Parser Type
   structType = do {return Struct}
@@ -57,8 +57,10 @@ module MGC.Parser.Type  where
   signature :: Parser Signature
   signature = do
     params <- parameters
-    result <- optionMaybe parameters
-    return $ Signature params result
+    result <- optionMaybe $ parameters <|> ((flip (:) []) <$> ((,) [] <$> (typeParser <* spaces)))
+    case result of
+      Nothing -> return $Signature params []
+      Just res -> return $ Signature params res
 
-  parameters = parens $ do{ids<-(option [] identifierList); tp<-typeParser; return (ids, tp)}`sepEndBy` lexeme ","
+  parameters = try $ parens $ do{ids<-(option [] identifierList); tp<-typeParser; return (ids, tp)}`sepEndBy` lexeme ","
  

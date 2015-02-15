@@ -28,13 +28,12 @@ module MGC.Parser where
     name <- identifier
     sig <- signature
     body <- optionMaybe blockStmt
-
     return $ FunctionDecl name sig body
     
   typeDec :: Parser TopLevelDeclaration
   typeDec = try $ do
     lexeme "type"
-    TypeDecl <$> ( (flip (:) []) <$> typeSpec <|> (parens $ typeSpec `sepEndBy` semi))
+    TypeDecl <$> ( (flip (:) []) <$> typeSpec <|> (parens' $ typeSpec `sepEndBy` semi'))
 
   typeSpec :: Parser (Identifier, Type)
   typeSpec =  (,) <$> identifier <*> typeParser
@@ -138,9 +137,7 @@ module MGC.Parser where
     idents <- identifierList
     lexeme ":="
     exprs  <- expressionList
-    if (length idents == length exprs)
-    then return $ ShortDecl idents exprs
-    else fail $ "left and right side of assign must match length"
+    return $ ShortDecl idents exprs
 
   expressionList = expression `sepEndBy` (lexeme ",")
 
