@@ -28,6 +28,7 @@ module MGC.Syntax where
    | QualName Identifier Identifier
    | Integer Int  
    | Rune Char
+   | Float Float
    | String String deriving (Show, Eq)
 
   data BinOp = Or | And 

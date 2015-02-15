@@ -119,3 +119,29 @@ module MGC.Parser.Prim where
     char '0'
     oneOf "xX"
     liftM (Integer . fst . head . readHex) (many1 hexDigit)
+
+  floatLit :: Parser Expression
+  floatLit = floatLitA <|> floatLitB <|> floatLitC
+
+  floatLitA :: Parser Expression
+  floatLitA = try $ do
+    int <- many digit
+    char '.'
+    dec <- (many1 digit) <|> (return "0")
+    exp <- optionMaybe $ (:) <$> (oneOf "eE") <*> ((:) <$> (oneOf "+-") <*> (many digit))
+    case exp of 
+      Just e -> return $ (Float . fst.head.readFloat) (int ++ "." ++ dec ++ e) 
+      _ -> return $ (Float . fst.head.readFloat) (int ++ "." ++ dec)
+
+  floatLitB :: Parser Expression
+  floatLitB = try $  do
+    int <- many digit
+    exp <- (:) <$> (oneOf "eE") <*> ((:) <$> (oneOf "+-") <*> (many digit))
+    return $ (Float .fst.head.readFloat) (int ++ exp)
+
+  floatLitC :: Parser Expression
+  floatLitC = try $ do
+    char '.'
+    dec <- many1 digit
+    exp <- (try $ (:) <$> (oneOf "eE") <*> ((:) <$> (oneOf "+-") <*> (many digit))) <|> (return "")
+    return $ (Float .fst.head.readFloat) ("0." ++ dec ++ exp)
