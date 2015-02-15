@@ -43,7 +43,15 @@ module MGC.ParserSpec (spec) where
       it "works with else branch" $ do
         ifStmt `parses` "if 0 {1}else{0}" ~> (If Nothing (Integer 0) (Block [(ExpressionStmt (Integer 1))]) (Block [(ExpressionStmt (Integer 0))]))
       it "works with else if branch" $ do
-        pending
+        let test = [string| 
+          if 0 {
+            1
+          } else if 1 {
+            0
+          }
+        |]
+        let expected =  (If Nothing (Integer 0) (Block [(ExpressionStmt (Integer 1))]) (If Nothing (Integer 1) (Block [(ExpressionStmt (Integer 0))]) Empty) )
+        ifStmt `parses` test ~> expected
 
     describe "return" $ do
       it "returns" $ do
