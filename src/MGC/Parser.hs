@@ -140,5 +140,3 @@ module MGC.Parser where
     return $ ShortDecl idents exprs
 
   expressionList = expression `sepEndBy` (lexeme ",")
-
- 

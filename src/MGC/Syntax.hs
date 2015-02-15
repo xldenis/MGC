@@ -1,7 +1,4 @@
-module MGC.Syntax (
-  Identifier(..), Signature(..), Package(..), TopLevelDeclaration(..), 
-  BinOp(..), UOp(..), Statement(..), ForCond(..), SwitchClause(..),
-  Type(..), Expression(..), MethodSpec(..), VarSpec(..)) where
+module MGC.Syntax where
 
   type Identifier = String
   data QualIdent = QualIdent String String
@@ -63,7 +60,7 @@ module MGC.Syntax (
   data Type = TypeName Identifier 
     | QualTypeName Identifier Identifier
     | Array Expression Type 
-    | Struct 
+    | Struct [FieldDecl]
     | Pointer Type 
     | Function Signature
     | Interface [MethodSpec] 
@@ -75,4 +72,6 @@ module MGC.Syntax (
     | TBool
     | Unit  deriving (Show, Eq)
 
+
+  data FieldDecl  = NamedField [Identifier] Type (Maybe  Expression) | AnonField Type (Maybe Expression) deriving (Show, Eq)
   data MethodSpec = MethodSpec Identifier Signature | InterfaceName Identifier  deriving (Show, Eq)

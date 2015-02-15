@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
+
 module MGC.ParserSpec (spec) where
   import NeatInterpolation
   import MGC.Expectation

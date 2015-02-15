@@ -44,7 +44,7 @@ module MGC.Parser.Prim where
   lexeme s = try $ string s <* lineSpace
 
   lexeme' :: String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
-  lexeme' s = try $ string s <* (try spaces)
+  lexeme' s = try $ string s <* (spaces)
 
   lineSpace :: Parser ()
   lineSpace = try $ many (satisfy (\x -> isSpace x && not (x == '\n' || x == '\r'))) >> return ()
@@ -88,7 +88,7 @@ module MGC.Parser.Prim where
     return $ (fst . head . readLitChar) ('\\':chars)
 
   stringLit :: Parser Expression
-  stringLit = String <$> (quotes (interpretedString) <|> ticks (many anyChar))
+  stringLit = try $ String <$> (quotes (interpretedString) <|> ticks (many anyChar))
 
   interpretedString :: Parser String
   interpretedString = many $ unicodeEscape <|> escapeSeq <|> (noneOf "\n\"")

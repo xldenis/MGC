@@ -1,5 +1,5 @@
 module MGC.Parser.Type  where
-  import MGC.Syntax (Type(..), MethodSpec(..), Signature(..))
+  import MGC.Syntax (Type(..), MethodSpec(..), Signature(..), FieldDecl(..), Identifier)
   import MGC.Parser.Prim
   import MGC.Parser.Expression
 
@@ -12,28 +12,35 @@ module MGC.Parser.Type  where
   typeParser = typeLit <|> typeName <|> (parens typeParser)
 
   typeName :: Parser Type
-  typeName = TypeName <$> reservedType
+  typeName = TypeName <$> (try $ reservedType)
 
   typeLit :: Parser Type
-  typeLit = builtins <|> arrayType <|> functionType <|> interfaceType <|> sliceType
+  typeLit = builtins <|> arrayType <|> functionType <|> pointerType <|> interfaceType <|> sliceType <|> structType
 
   arrayType :: Parser Type
-  arrayType = Array <$> (brackets expression) <*> typeParser
+  arrayType = try $ Array <$> (brackets expression) <*> typeParser
 
   sliceType :: Parser Type
-  sliceType = try $ do{char '[';char ']'; tp <- typeParser; return $ Slice tp }
+  sliceType = try $ string "[]" *> (Slice <$> typeParser)
 
   builtins :: Parser Type
-  builtins = (string "int" *> return TInteger) <|> (string "float64" *> return TFloat) <|> (string "rune" *> return TRune) <|> (string "string" *> return TString) <|> (string "bool" *> return TBool)
+  builtins = try $ (string "int" *> return TInteger) <|> (string "float64" *> return TFloat) <|> (string "rune" *> return TRune) <|> (string "string" *> return TString) <|> (string "bool" *> return TBool)
 
   structType :: Parser Type
-  structType = do {return Struct}
-  --structType = do
-  --  string "struct"
-  --  braces many (fieldDecl <* semi)
+  structType = do
+    reserved "struct"
+    fields <- braces $ many (fieldDecl <* semi')
+    return $ Struct fields
 
-  --fieldDecl = do
-  --  many identifier <* (char ",") <|> 
+  fieldDecl = namedField <|> anonField
+
+  tag = try $ optionMaybe stringLit
+  namedField =  do
+    p <- param 
+    t <- tag
+    return $ NamedField (fst p) (snd p) t
+
+  anonField = try $ (AnonField <$> ((optional $ (char '*')) *> typeName) <*> tag)
 
   pointerType :: Parser Type
   pointerType = try $ do 
@@ -62,5 +69,7 @@ module MGC.Parser.Type  where
       Nothing -> return $Signature params []
       Just res -> return $ Signature params res
 
-  parameters = try $ parens $ do{ids<-(option [] identifierList); tp<-typeParser; return (ids, tp)}`sepEndBy` lexeme ","
- 
+  parameters = try $ parens $ param `sepEndBy` lexeme ","
+
+  param :: Parser ([Identifier], Type)
+  param = do{ids<-(option [] identifierList); tp<-typeParser; return (ids, tp)}
