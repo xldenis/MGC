@@ -3,7 +3,7 @@ module MGC.Syntax where
   type Identifier = String
   data QualIdent = QualIdent String String
 
-  data Package = Package Identifier [TopLevelDeclaration]
+  data Package = Package Identifier [TopLevelDeclaration] deriving (Show, Eq)
 
   data TopLevelDeclaration = FunctionDecl Identifier Signature (Maybe Statement)
     | TypeDecl [(Identifier, Type)] 

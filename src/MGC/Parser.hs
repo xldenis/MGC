@@ -16,6 +16,14 @@ module MGC.Parser where
 
   addOpParser = string "+" *> return Plus
 
+  package :: Parser Package
+
+  package = do
+    reserved "package"
+    name <- identifier 
+    semi'
+    content <- many topLevelDef
+    return $ Package name content
   topLevelDef :: Parser TopLevelDeclaration
   topLevelDef = declaration <|> funcDec
 
@@ -57,7 +65,7 @@ module MGC.Parser where
     else fail $ "assign a value to every variable"
 
   statement :: Parser Statement
-  statement = simpleStatement <|> returnStmt <|> ifStmt <|> switchStmt <|> forStmt <|> blockStmt 
+  statement = simpleStatement <|> returnStmt <|> ifStmt <|> switchStmt <|> forStmt <|> blockStmt <|> ((return Empty) <* ((char ';') <* spaces))
 
   returnStmt :: Parser Statement
   returnStmt = do
