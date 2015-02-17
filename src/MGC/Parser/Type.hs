@@ -1,8 +1,7 @@
 module MGC.Parser.Type  where
-  import MGC.Syntax (Type(..), MethodSpec(..), Signature(..), FieldDecl(..), Identifier)
+  import MGC.Syntax (Type(..), MethodSpec(..), Signature(..), FieldDecl(..), Identifier, Parameter(..))
   import MGC.Parser.Prim
   import MGC.Parser.Expression
-
 
   import Text.Parsec
   import Text.Parsec.String
@@ -37,7 +36,7 @@ module MGC.Parser.Type  where
   tag = try $ optionMaybe stringLit
 
   namedField = try $ do
-    p <- param 
+    p <- (,) <$>  (option [] identifierList) <*> typeParser
     t <- tag
     return $ NamedField (fst p) (snd p) t
 
@@ -65,12 +64,12 @@ module MGC.Parser.Type  where
   signature :: Parser Signature
   signature = try $ do
     params <- parameters
-    result <- optionMaybe $ parameters <|> ((flip (:) []) <$> ((,) [] <$> (typeParser <* spaces)))
+    result <- optionMaybe $ parameters <|> ((flip (:) []) <$> (Parameter [] <$> (typeParser <* spaces)))
     case result of
       Nothing -> return $Signature params []
       Just res -> return $ Signature params res
 
   parameters = try $ parens $ param `sepEndBy` lexeme ","
 
-  param :: Parser ([Identifier], Type)
-  param = try $ do{ids<-(option [] identifierList); tp<-typeParser; return (ids, tp)}
+  param :: Parser Parameter
+  param = try $ do{ids<-(option [] identifierList); tp<-typeParser; return $ Parameter ids tp}

@@ -18,9 +18,9 @@ module MGC.ParserSpec (spec) where
 
     describe "typeDec" $ do
       it "parses single types" $ do
-        typeDec `parses` "type IntArray [16]int" ~> TypeDecl [("IntArray", Array (Integer 16) (TInteger))]
+        typeDec `parses` "type IntArray [16]int" ~> TypeDecl [TypeSpec "IntArray" $ Array (Integer 16) (TInteger)]
       it "parses multi-type delcarations" $ do
-        typeDec `parses` "type ( Polar Point; IntArray [16]int)" ~> TypeDecl [("Polar", (TypeName "Point")), ("IntArray", Array (Integer 16) (TInteger))]
+        typeDec `parses` "type ( Polar Point; IntArray [16]int)" ~> TypeDecl [TypeSpec "Polar" (TypeName "Point"), TypeSpec "IntArray" $ Array (Integer 16) (TInteger)]
       it "parses multi-line types" $ do
         let test = [string|
           type (
@@ -28,7 +28,7 @@ module MGC.ParserSpec (spec) where
             IntArray [16]int
           )
         |]
-        typeDec `parses` test ~> TypeDecl [("Polar", (TypeName "Point")), ("IntArray", Array (Integer 16) (TInteger))]
+        typeDec `parses` test ~> TypeDecl [TypeSpec "Polar" (TypeName "Point"), TypeSpec "IntArray"  $ Array (Integer 16) (TInteger)]
 
     describe "block statement" $ do
       it "allows semi colons" $ do
@@ -93,16 +93,16 @@ module MGC.ParserSpec (spec) where
 
     describe "function declarations" $ do
       it "parses function signatures" $ do
-        funcDec `parses` "func flushICache(begin, end uintptr)" ~> (FunctionDecl "flushICache" (Signature [(["begin", "end"], (TypeName "uintptr"))] [])  Nothing)
+        funcDec `parses` "func flushICache(begin, end uintptr)" ~> (FunctionDecl "flushICache" (Signature [Parameter ["begin", "end"] (TypeName "uintptr")] [])  Nothing)
       it "parses func x(int) int" $ do
-        funcDec `parses` "func x(int) int " ~> FunctionDecl "x" (Signature [([], TInteger)] [([], TInteger)]) Nothing
+        funcDec `parses` "func x(int) int " ~> FunctionDecl "x" (Signature [Parameter [] TInteger] [Parameter [] TInteger]) Nothing
       it "parses full functions" $ do
         let test = [string|
           func x(y int) bool {
             y++
           }
         |]
-        let expected = FunctionDecl "x" (Signature [(["y"], TInteger)] [([], TBool)]) (Just $ Block [Inc (Name "y")])
+        let expected = FunctionDecl "x" (Signature [Parameter ["y"] TInteger] [Parameter [] TBool]) (Just $ Block [Inc (Name "y")])
         funcDec `parses` test ~> expected
 
     describe "simpleStatement" $ do

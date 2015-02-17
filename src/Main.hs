@@ -2,10 +2,14 @@ import System.Environment
 import MGC.Parser
 import Text.Parsec
 
+import MGC.Syntax.Pretty
+
 import Control.Applicative ((<$>), (<*))
 
 main :: IO ()
 main = do
   args <- getArgs
   ast  <- (parse (package <* eof) "") <$> readFile (head args)
-  print ast
+  case ast of 
+    Left a -> putStrLn $ show a
+    Right ast -> putStrLn $ prettyShow $ pPrint ast

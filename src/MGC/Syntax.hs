@@ -6,12 +6,14 @@ module MGC.Syntax where
   data Package = Package Identifier [TopLevelDeclaration] deriving (Show, Eq)
 
   data TopLevelDeclaration = FunctionDecl Identifier Signature (Maybe Statement)
-    | TypeDecl [(Identifier, Type)] 
+    | TypeDecl [TypeSpec] 
     | VarDecl [VarSpec] deriving (Show, Eq)
 
-  data Signature = Signature Parameters  Parameters deriving (Show, Eq)
+  data Signature = Signature [Parameter]  [Parameter] deriving (Show, Eq)
 
-  type Parameters = [([Identifier], Type)]
+  data Parameter = Parameter [Identifier] Type deriving (Show, Eq)
+
+  data TypeSpec = TypeSpec Identifier Type deriving (Show, Eq)
 
   data VarSpec = VarSpec [Identifier] [Expression] Type  deriving (Show, Eq)
 

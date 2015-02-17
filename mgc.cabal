@@ -23,15 +23,16 @@ library
     MGC.Parser.Prim
     MGC.Parser.Type
     MGC.Syntax
+    MGC.Syntax.Pretty
     MGC
 
-  build-depends:       base >=4.7 && <4.8, parsec >= 3.0
+  build-depends:       base >=4.7 && <4.8, parsec >= 3.0, pretty >= 1.1.2.1
   hs-source-dirs:      src
   default-language:    Haskell2010
 
 executable mgc
   main-is:             Main.hs    
-  build-depends:       base >=4.7 && <4.8, parsec >= 3.0
+  build-depends:       base >=4.7 && <4.8, parsec >= 3.0, pretty >= 1.1.2.1
   hs-source-dirs:      src
   default-language:    Haskell2010
 

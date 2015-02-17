@@ -3,6 +3,8 @@ module MGC.Parser.Expression  where
   import Text.Parsec.String
   import Text.Parsec
 
+  import {-# SOURCE #-} MGC.Parser.Type
+
   import Control.Applicative ((<$>), (<*), (*>), (<*>))
   import Control.Monad ((>>), liftM2, liftM)
 
@@ -48,6 +50,7 @@ module MGC.Parser.Expression  where
 
   name :: Parser Expression
   name = (Name <$> identifier) <|> (QualName <$> identifier <*> identifier)
+  
   --conversion :: Parser Expression
   --conversion = liftM2 typeParser (parens $ expression <* optional lexeme "," )
 
@@ -70,5 +73,8 @@ module MGC.Parser.Expression  where
   --typeAssertion :: Parser Expression
   --typeAssertion  = char '.' >> parens typeParser
 
-  --args :: Parser Expression
+  args :: Parser Expression
+  args = Arguments <$> parens expressionList
 
+
+  expressionList = expression `sepEndBy` (lexeme ",")

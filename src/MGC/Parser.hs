@@ -43,13 +43,13 @@ module MGC.Parser where
     lexeme "type"
     TypeDecl <$> ( (flip (:) []) <$> typeSpec <|> (parens' $ typeSpec `sepEndBy` semi'))
 
-  typeSpec :: Parser (Identifier, Type)
-  typeSpec =  (,) <$> identifier <*> typeParser
+  typeSpec :: Parser TypeSpec
+  typeSpec =  TypeSpec <$> identifier <*> typeParser
 
   varDec :: Parser TopLevelDeclaration
   varDec = try $ do
     lexeme "var"
-    VarDecl <$> (parens $ (varSpec `sepEndBy` semi))
+    VarDecl <$> ((flip (:) []) <$> varSpec <|> (parens' $ (varSpec `sepEndBy` semi)))
 
   varSpec = try $ do
     idents <- identifierList
@@ -147,4 +147,3 @@ module MGC.Parser where
     exprs  <- expressionList
     return $ ShortDecl idents exprs
 
-  expressionList = expression `sepEndBy` (lexeme ",")
