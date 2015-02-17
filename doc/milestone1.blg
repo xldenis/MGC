@@ -1,0 +1,9 @@
+[0] Config.pm:387> INFO - This is Biber 1.6
+[1] Config.pm:390> INFO - Logfile is 'milestone1.blg'
+[76] biber-darwin:218> INFO - === Mon Feb 16, 2015, 23:49:42
+[77] Biber.pm:325> INFO - Reading 'milestone1.bcf'
+[141] Biber.pm:623> INFO - Found 0 citekeys in bib section 0
+[141] Utils.pm:169> WARN - The file 'milestone1.bcf' does not contain any citations!
+[161] bbl.pm:472> INFO - Writing 'milestone1.bbl' with encoding 'ascii'
+[162] bbl.pm:545> INFO - Output to milestone1.bbl
+[162] Biber.pm:105> INFO - WARNINGS: 1
