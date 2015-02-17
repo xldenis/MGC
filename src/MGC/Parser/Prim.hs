@@ -11,7 +11,7 @@ module MGC.Parser.Prim where
   reservedWords = [ 
     "append", "bool", "break", "case", "chan", "const", "continue", "default",
     "defer", "else", "fallthrough", "float64", "for", "func", "go", "goto",
-    "if", "import", "int", "interface", "map", "package", "print", "println",
+    "if", "import", "int", "interface", "map", "package", -- "print", "println",
     "range", "return", "rune", "select", "string", "struct", "switch", "type", "var" ]
 
   reservedTypes = [ "int", "interface", "float64", "bool", "int", "rune", "map", "chan", "func"]
@@ -38,7 +38,8 @@ module MGC.Parser.Prim where
   ticks = between (char '`') (char '`')
 
   semi = lexeme ";" >> return ()
-  semi' = (lexeme' ";" >> return ()) <|> spaces
+
+  semi' = (lexeme' ";" >> return ()) <|> fullSpace
 
   lexeme :: String -> Parser String
   lexeme s = try $ string s <* lineSpace
@@ -46,8 +47,32 @@ module MGC.Parser.Prim where
   lexeme' :: String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
   lexeme' s = try $ string s <* (spaces)
 
+  fullSpace :: Parser ()
+  fullSpace = try $ do
+    many $ lineComment <|> (space >> spaces >> return ()) <|> singleComment <|> fullComment
+    return ()
   lineSpace :: Parser ()
-  lineSpace = try $ many (satisfy (\x -> isSpace x && not (x == '\n' || x == '\r'))) >> return ()
+  lineSpace = try $ do
+    many $ lineComment <|> (satisfy (\x -> isSpace x && not (x == '\n' || x == '\r')) >> return ())
+    return ()
+
+  singleComment :: Parser ()
+  singleComment = try $ do
+    string "//"
+    manyTill anyChar (try $ char '\n')
+    return ()
+
+  fullComment :: Parser ()
+  fullComment = try $ do
+    string "/*"
+    manyTill anyChar (try $ string "*/")
+    return ()
+
+  lineComment :: Parser ()
+  lineComment = try $ do
+    string "/*"
+    manyTill (noneOf "\n") (try $ string "*/")
+    return () 
 
   reserved :: String -> Parser String
   reserved s = try $ do
@@ -88,20 +113,20 @@ module MGC.Parser.Prim where
     return $ (fst . head . readLitChar) ('\\':chars)
 
   stringLit :: Parser Expression
-  stringLit = try $ String <$> (quotes (interpretedString) <|> (try $ ticks (many (noneOf "`"))))
+  stringLit = try $ (quotes (interpretedString) <|> (try $ RawString <$> (ticks (many (noneOf "`"))))) 
 
-  interpretedString :: Parser String
-  interpretedString = try $ many $ unicodeEscape <|> escapeSeq <|> (noneOf "\n\"")
+  interpretedString :: Parser Expression
+  interpretedString = try $ IntString . concat <$> (many $ unicodeEscape <|> escapeSeq <|> (flip (:) [] <$> (noneOf "\n\"")))
 
-  unicodeEscape :: Parser Char
+  unicodeEscape :: Parser String
   unicodeEscape = try $ do
     len <- char '\\' *> (char 'u' <|> char 'U')
     case len of 
-      'U' ->  fst . head . readLitChar . ((++) "\\") <$> count 8 hexDigit
-      'u' ->  fst . head . readLitChar . ((++) "\\") <$> count 4 hexDigit
+      'U' ->  ((++) "\\U") <$> count 8 hexDigit
+      'u' ->  ((++) "\\u") <$> count 4 hexDigit
 
-  escapeSeq :: Parser Char
-  escapeSeq = try $ (char '\\') *> liftM ( fst . head . readLitChar . (:) '\\' . (flip (:) [])) (oneOf "abfnrtv\\'\"")
+  escapeSeq :: Parser String
+  escapeSeq = try $ (char '\\') *> liftM ((:) '\\' . (flip (:) [])) (oneOf "abfnrtv\\'\"")
 
   intLit ::  Parser Expression
   intLit = (hexLit <|> octLit <|> decimalLit) <* lineSpace

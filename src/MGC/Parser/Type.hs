@@ -64,7 +64,7 @@ module MGC.Parser.Type  where
   signature :: Parser Signature
   signature = try $ do
     params <- parameters
-    result <- optionMaybe $ parameters <|> ((flip (:) []) <$> (Parameter [] <$> (typeParser <* spaces)))
+    result <- optionMaybe $ parameters <|> ((flip (:) []) <$> (Parameter [] <$> (typeParser <* fullSpace)))
     case result of
       Nothing -> return $Signature params []
       Just res -> return $ Signature params res

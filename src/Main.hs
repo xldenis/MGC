@@ -12,4 +12,5 @@ main = do
   ast  <- (parse (package <* eof) "") <$> readFile (head args)
   case ast of 
     Left a -> putStrLn $ show a
-    Right ast -> putStrLn $ prettyShow $ pPrint ast
+    Right ast -> do 
+      putStrLn $ prettyShow $ pPrint ast

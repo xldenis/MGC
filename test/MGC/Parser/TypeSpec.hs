@@ -34,5 +34,5 @@ module MGC.Parser.TypeSpec (spec) where
               F func()
             }
           |]
-          let expected = Struct [NamedField ["x","y"] TInteger (Just $ String "test"),NamedField ["u"] (TypeName "float32") Nothing,NamedField ["_"] (TypeName "float32") Nothing,NamedField ["A"] (Slice TInteger) Nothing,NamedField ["F"] (Function (Signature [] [])) Nothing]
+          let expected = Struct [NamedField ["x","y"] TInteger (Just $ IntString "test"),NamedField ["u"] (TypeName "float32") Nothing,NamedField ["_"] (TypeName "float32") Nothing,NamedField ["A"] (Slice TInteger) Nothing,NamedField ["F"] (Function (Signature [] [])) Nothing]
           typeParser `parses` test ~> expected

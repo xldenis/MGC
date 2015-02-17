@@ -19,7 +19,7 @@ module MGC.Parser.Expression  where
 
 
   table = [
-     [Postfix (selector), Postfix (index) ]
+     [Postfix (selector), Postfix (index), Postfix (args), Postfix (slice)]
    , (map (\(s,tp) -> prefix s tp) unaryOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) mulOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) addOps)
@@ -46,13 +46,13 @@ module MGC.Parser.Expression  where
   primaryExpr = (operand) <* lineSpace
 
   operand :: Parser Expression
-  operand = literal <|> name <|> (parens expression)
+  operand = literal <|> name <|> conversion <|> (parens expression)
 
   name :: Parser Expression
   name = (Name <$> identifier) <|> (QualName <$> identifier <*> identifier)
-  
-  --conversion :: Parser Expression
-  --conversion = liftM2 typeParser (parens $ expression <* optional lexeme "," )
+
+  conversion :: Parser Expression
+  conversion = Conversion <$>  typeParser <*> (parens $ expression <* (optional $ lexeme "," ))
 
   selector :: Parser (Expression -> Expression)
   selector = try $ do{lexeme' "."; i <- identifier;  return $ (flip Selector) i}
@@ -60,21 +60,21 @@ module MGC.Parser.Expression  where
   index :: Parser (Expression -> Expression)
   index = try $ liftM (flip Index) (brackets expression)
 
-  slice :: Parser Expression
+  slice :: Parser (Expression -> Expression)
   slice = try $ brackets $ do 
     e1 <- expression 
     lexeme ":"
     e2 <- expression
     a <- optionMaybe (lexeme ":" *> expression)
     case a of
-      Just e3 -> return $ FullSlice e1 e2 e3
-      Nothing -> return $ SimpleSlice e1 e2
+      Just e3 -> return $ (\x -> FullSlice x e1 e2 e3)
+      Nothing -> return $ (\x -> SimpleSlice x e1 e2)
     
   --typeAssertion :: Parser Expression
   --typeAssertion  = char '.' >> parens typeParser
 
-  args :: Parser Expression
-  args = Arguments <$> parens expressionList
+  args :: Parser (Expression -> Expression)
+  args = (flip Arguments) <$> parens expressionList
 
 
   expressionList = expression `sepEndBy` (lexeme ",")

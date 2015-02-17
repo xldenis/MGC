@@ -6,8 +6,7 @@ module MGC.Syntax where
   data Package = Package Identifier [TopLevelDeclaration] deriving (Show, Eq)
 
   data TopLevelDeclaration = FunctionDecl Identifier Signature (Maybe Statement)
-    | TypeDecl [TypeSpec] 
-    | VarDecl [VarSpec] deriving (Show, Eq)
+    | Decl Statement deriving (Show, Eq)
 
   data Signature = Signature [Parameter]  [Parameter] deriving (Show, Eq)
 
@@ -22,16 +21,18 @@ module MGC.Syntax where
    | Conversion Type Expression
    | Selector Expression Identifier
    | Index Expression Expression
-   | SimpleSlice Expression Expression
-   | FullSlice Expression Expression Expression
+   | SimpleSlice Expression Expression Expression
+   | FullSlice Expression Expression Expression Expression
    | TypeAssertion Type
-   | Arguments [Expression]
+   | Arguments Expression [Expression]
    | Name Identifier
    | QualName Identifier Identifier
+   
    | Integer Int  
    | Rune Char
    | Float Float
-   | String String deriving (Show, Eq)
+   | IntString String 
+   | RawString String deriving (Show, Eq)
 
   data BinOp = Or | And 
     | Eq | NEq | LessThan | LessThanEq | GreaterThan | GreaterThanEq
@@ -53,6 +54,8 @@ module MGC.Syntax where
     | ExpressionStmt Expression
     | Inc Expression
     | Dec Expression
+    | TypeDecl [TypeSpec]
+    | VarDecl [VarSpec] 
     | Assignment BinOp [Expression] [Expression]
     | ShortDecl [Identifier] [Expression]  deriving (Show, Eq)
 

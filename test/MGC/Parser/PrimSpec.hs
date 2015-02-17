@@ -27,11 +27,11 @@ module MGC.Parser.PrimSpec (spec) where
         it "parses interpreted strings" $ do
           pending
         it "parses literal strings" $ do
-          stringLit `parses` "`test`" ~> (String "test")
+          stringLit `parses` "`test`" ~> (RawString "test")
         it "parses unicode literals" $ do
-          stringLit `parses` "\"\\u0000\"" ~> (String "\0000")
+          stringLit `parses` "\"\\u0000\"" ~> (IntString "\\u0000")
         it "parses escape sequences" $ do
-          stringLit `parses` "\" \\n \\r \\t \\a \\' \\\" \"" ~> (String " \n \r \t \a \' \" ")
+          stringLit `parses` "\" \\n \\r \\t \\a \\' \\\" \"" ~> (IntString " \\n \\r \\t \\a \\' \\\" ")
       describe "runes" $ do
         it "recognizes normal chars" $ do
           runeLit `parses` "'a'" ~> (Rune 'a')

@@ -25,7 +25,7 @@ module MGC.Parser.ExpressionSpec (spec) where
     describe "operand" $ do
       it "parses literals" $ do
         operand `parses` "0X15" ~> (Integer 21)
-        operand `parses` "\"asasdasdadsd\\n\"" ~> (String "asasdasdadsd\n")
+        operand `parses` "\"asasdasdadsd\\n\"" ~> (IntString "asasdasdadsd\\n")
       it "allows parens" $ do
         operand `parses` "(0)" ~> Integer 0
     describe "slice" $ do
