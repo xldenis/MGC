@@ -19,3 +19,11 @@ type MyStruct struct {
   x, y int `json: ""magic` // comment
   y int /* comment */
 }
+
+func main() {
+  x1, x2 := 1,2
+  for {
+    x1, x2 := x2, x1*x2
+    print (x1)
+  }
+}
