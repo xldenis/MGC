@@ -32,7 +32,7 @@ library
 
 executable mgc
   main-is:             Main.hs    
-  build-depends:       mgc, base >=4.7 && <4.8, parsec >= 3.0, pretty >= 1.1.2.1, filepath
+  build-depends:       base >=4.7 && <4.8, parsec >= 3.0, pretty >= 1.1.2.1, filepath
   hs-source-dirs:      src
   default-language:    Haskell2010
 
@@ -42,10 +42,10 @@ test-suite tests
   default-extensions: OverloadedStrings
   type:               exitcode-stdio-1.0
   main-is:            Test.hs
-  hs-source-dirs:     test
-  build-depends:      base >=4.7, 
+  hs-source-dirs:     test, src
+  build-depends:      base >=4.7,
+                      template-haskell,
                       parsec >= 3.0,
                       hspec,
                       hspec-expectations,
-                      mgc,
                       neat-interpolation
