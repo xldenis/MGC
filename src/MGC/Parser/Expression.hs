@@ -35,7 +35,6 @@ module MGC.Parser.Expression  where
   opLetter :: [Char]
   opLetter = "+-/%*=!<>|&^"
 
-
   op :: String -> Parser ()
   op s = try $ string s >> notFollowedBy (oneOf opLetter) >> lineSpace
 
@@ -52,7 +51,7 @@ module MGC.Parser.Expression  where
   name = (Name <$> identifier) <|> (QualName <$> identifier <*> identifier)
 
   conversion :: Parser Expression
-  conversion = Conversion <$>  typeParser <*> (parens $ expression <* (optional $ lexeme "," ))
+  conversion = try $ Conversion <$>  typeParser <*> (parens $ expression <* (optional $ lexeme "," ))
 
   selector :: Parser (Expression -> Expression)
   selector = try $ do{lexeme' "."; i <- identifier;  return $ (flip Selector) i}

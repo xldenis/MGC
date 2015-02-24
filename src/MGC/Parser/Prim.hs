@@ -51,6 +51,7 @@ module MGC.Parser.Prim where
   fullSpace = try $ do
     many $ lineComment <|> (space >> spaces >> return ()) <|> singleComment <|> fullComment
     return ()
+    
   lineSpace :: Parser ()
   lineSpace = try $ do
     many $ lineComment <|> (satisfy (\x -> isSpace x && not (x == '\n' || x == '\r')) >> return ())
