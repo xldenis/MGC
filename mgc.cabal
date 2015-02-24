@@ -48,4 +48,5 @@ test-suite tests
                       --template-haskell >= 2.8,
                       bytestring,
                       parsec >= 3.0,
+                      bytestring == 0.10.4.0,
                       neat-interpolation
