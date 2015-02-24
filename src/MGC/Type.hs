@@ -9,5 +9,9 @@ module MGC.Type where
 
   Check e w a = ExceptT e (Writer w) a
 
-  typecheck :: [TopLevelDeclaration] -> Check Type String TypeError
+  typecheck :: Env -> [TopLevelDeclaration] -> Check Type String TypeError
   typecheck = return TInt
+
+  checkStmt :: Env -> Statement -> Check Type String TypeError
+
+  checkExpr :: Env -> Expression -> Check Type String TypeError
