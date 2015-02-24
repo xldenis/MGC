@@ -45,6 +45,7 @@ test-suite tests
   hs-source-dirs:     test, src
   build-depends:      base >=4.7,
                       hspec >= 2.1,
+                      hspec-expectations,
                       --template-haskell >= 2.8,
                       bytestring,
                       parsec >= 3.0,
