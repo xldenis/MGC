@@ -63,9 +63,8 @@ test-suite tests
   default-extensions: OverloadedStrings
   type:               exitcode-stdio-1.0
   main-is:            Test.hs
-  hs-source-dirs:     test
-  build-depends:      mgc,
-                      base >=4.7,
+  hs-source-dirs:     test, src
+  build-depends:      base >=4.7,
                       parsec >= 3.0,
                       hspec >= 2.1,
                       hspec-expectations,
