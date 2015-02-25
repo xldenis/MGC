@@ -45,7 +45,7 @@ module MGC.Parser.Prim where
   lexeme s = try $ string s <* lineSpace
 
   lexeme' :: String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
-  lexeme' s = try $ string s <* (spaces)
+  lexeme' s = try $ string s <* (fullSpace)
 
   fullSpace :: Parser ()
   fullSpace = try $ do

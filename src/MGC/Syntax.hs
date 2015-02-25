@@ -5,7 +5,8 @@ module MGC.Syntax where
 
   data Package = Package Identifier [TopLevelDeclaration] deriving (Show, Eq)
 
-  data TopLevelDeclaration = FunctionDecl Identifier Signature (Maybe Statement)
+  data TopLevelDeclaration 
+    = FunctionDecl Identifier Signature (Maybe Statement)
     | Decl Statement deriving (Show, Eq)
 
   data Signature = Signature [Parameter]  [Parameter] deriving (Show, Eq)
@@ -16,34 +17,36 @@ module MGC.Syntax where
 
   data VarSpec = VarSpec [Identifier] [Expression] Type  deriving (Show, Eq)
 
-  data Expression = BinaryOp BinOp Expression Expression
+  data Expression 
+   = BinaryOp BinOp Expression Expression
    | UnaryOp UOp Expression
    | Conversion Type Expression
    | Selector Expression Identifier
    | Index Expression Expression
    | SimpleSlice Expression Expression Expression
    | FullSlice Expression Expression Expression Expression
-   | TypeAssertion Type
+   -- | TypeAssertion Type
    | Arguments Expression [Expression]
    | Name Identifier
    | QualName Identifier Identifier
-   
    | Integer Int  
    | Rune Char
    | Float Float
    | IntString String 
    | RawString String deriving (Show, Eq)
 
-  data BinOp = Or | And 
+  data BinOp 
+    = Or | And 
     | Eq | NEq | LessThan | LessThanEq | GreaterThan | GreaterThanEq
     | Plus | Minus | BitOr | BitXor
     | Mult | Div | Mod | LShift | RShift | BitAnd | BitClear  deriving (Show, Eq)
     
   data UOp = Pos | Neg | Not | BComp  deriving (Show, Eq)
 
-  data Statement = Print
-    | PrintLn
-    | Return [Expression]
+    -- = Print
+    -- | PrintLn
+  data Statement
+    = Return [Expression]
     | If (Maybe Statement) Expression Statement Statement
     | Switch (Maybe Statement) (Maybe Expression) [SwitchClause]
     | For (Maybe ForCond) Statement
@@ -63,7 +66,8 @@ module MGC.Syntax where
 
   type SwitchClause = (Maybe [Expression], [Statement])
 
-  data Type = TypeName Identifier 
+  data Type 
+    = TypeName Identifier 
     | QualTypeName Identifier Identifier
     | Array Expression Type 
     | Struct [FieldDecl]

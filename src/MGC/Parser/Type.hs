@@ -1,5 +1,5 @@
 module MGC.Parser.Type  where
-  import MGC.Syntax (Type(..), MethodSpec(..), Signature(..), FieldDecl(..), Identifier, Parameter(..))
+  import MGC.Syntax
   import MGC.Parser.Prim
   import MGC.Parser.Expression
 

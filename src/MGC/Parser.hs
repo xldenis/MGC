@@ -19,6 +19,7 @@ module MGC.Parser where
   package :: Parser Package
 
   package = do
+    fullSpace
     reserved "package"
     name <- identifier 
     semi'
@@ -50,7 +51,7 @@ module MGC.Parser where
   varDec :: Parser Statement
   varDec = try $ do
     lexeme "var"
-    VarDecl <$> ((flip (:) []) <$> varSpec <|> (parens' $ (varSpec `sepEndBy` semi)))
+    VarDecl <$> ((flip (:) []) <$> varSpec <|> (parens' $ (varSpec `sepEndBy` semi')))
 
   varSpec = try $ do
     idents <- identifierList

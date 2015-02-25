@@ -10,23 +10,21 @@ module MGC.Syntax.Pretty where
   a $-$ b = a <> (char '\n') <+> b
 
   data Doc = Doc Int String
-    | Union Int [Doc]
-    | Beside Doc Doc 
+    | VUnion Int [Doc]
+    | HUnion Int [Doc]
     | EmptyDoc deriving Show
 
   class Pretty a where
-    pPrint :: a -> Doc
-    pPrintList :: [a] -> Doc
-    pPrintList lst = Union 0 (map pPrint lst)
+    pretty :: a -> Doc
+    prettyList :: [a] -> Doc
+    prettyList lst = VUnion 0 (map pretty lst)
  
-
   instance Pretty a => Pretty [a] where 
-    pPrint x = pPrintList x
-
+    pretty x = prettyList x
 
   instance Pretty a => Pretty (Maybe a) where
-    pPrint (Just a) = pPrint a
-    pPrint Nothing = empty
+    pretty (Just a) = pretty a
+    pretty Nothing = empty
 
   text :: String -> Doc
   text = Doc 0 
@@ -41,35 +39,39 @@ module MGC.Syntax.Pretty where
   char c = Doc 0 [c]
 
   flatten :: Doc -> Doc
-  flatten (Union ind c) = case (foldl (\p n -> p <+> n ) empty c) of
-    Doc i str -> Doc ind str
+  flatten (VUnion ind c) = case (foldl (\p n -> p <+> n ) empty c) of
+    Doc _ str -> Doc ind str
+    a -> a
   flatten a = a
 
   (<>) :: Doc -> Doc -> Doc
   a <> EmptyDoc = a
   EmptyDoc <> a = a
-  (Doc int s) <> (Doc int2 t) = Doc int (s++t)
-  a <> b = Beside a b
-
+  (Doc int s) <> (Doc _ t) = Doc int (s++t)
+  (HUnion in1 s) <> (VUnion in2 t) = HUnion in1 $ s ++ [(head t), (VUnion in2 (tail t))]
+  (HUnion in1 s) <> b@(Doc _ _) = HUnion in1 (s++[b])
+  (HUnion in1 s) <> (HUnion _ t) = HUnion in1 (s++t)
+  a <> b = HUnion 0 [a,b]
 
   (<+>) :: Doc -> Doc -> Doc
-  (Doc in1 s) <+> (Doc _ t) = Doc in1 (s++" "++t)
-  (Doc in1 s) <+> a = Beside (Doc in1 $ s++" ") a
-  (Union in1 s) <+> a = Beside (Union in1 $ (init s)++[(last s) <> (char ' ')]) a
-  (Beside a b) <+> c = Beside a (b <+> c)
   a <+> EmptyDoc = a
   EmptyDoc <+> a = a
+  (Doc in1 s) <+> (Doc _ t) = Doc in1 (s++" "++t)
+  (Doc in1 s) <+> a = (HUnion in1 [Doc 0 $ s++" "]) <> a
+  (VUnion in1 s) <+> b = HUnion in1 $ (VUnion 0 s) : [char ' ', b]
+  (HUnion in1 s) <+> (VUnion in2 t) = HUnion in1 $ s ++ [(head t), (VUnion in2 (tail t))]
+  (HUnion in1 s) <+> c = HUnion in1 $ s ++ [char ' ', c]
 
   ($$) :: Doc -> Doc -> Doc
-  (Doc in1 s) $$ a = Union in1 ((Doc 0 s):[a])
-  (Union in1 s) $$ a  = Union in1 (s++[a])
+  (Doc in1 s) $$ a = VUnion in1 ((Doc 0 s):[a])
+  (VUnion in1 s) $$ a  = VUnion in1 (s++[a])
 
   empty :: Doc
   empty = EmptyDoc
 
   nest n (Doc ind txt) = Doc (ind+n) txt
-  nest n (Union ind lst) = Union (ind+n) lst
-
+  nest n (VUnion ind lst) = VUnion (ind+n) lst
+    
   braces :: Doc -> Doc
   braces d = (char '{') $$ d $$ (char '}')
 
@@ -91,112 +93,114 @@ module MGC.Syntax.Pretty where
   prettyShow :: Doc -> String
   prettyShow = prettyShow' 0
 
-  prettyShow' n (Union ind stmts) = intercalate "\n" $ map (prettyShow' $ n+ind) stmts
+  prettyShow' n (VUnion ind stmts) = "\n" ++ (intercalate "\n" $ map (prettyShow' $ n+ind) stmts)
   prettyShow' n (Doc ind stmt) = (replicate (n + ind) ' ')++ stmt
-  prettyShow' n (Beside a b) = (prettyShow' n a) ++ (prettyShow' 0 b)
-  prettyShow' n EmptyDoc = ""
+  prettyShow' n (HUnion ind s) = (prettyShow' (ind+n) (head s)) ++ (concatMap (prettyShow' 0) (tail s))
+  prettyShow' _ EmptyDoc = ""
 
   instance Pretty Package where
-    pPrint (Package name content) = text "package" <+> text name <+> text "\n\n" <> (pPrint content)
+    pretty (Package name content) = text "package" <+> text name <+> text "\n\n" <> (pretty content)
 
   instance Pretty TopLevelDeclaration where
-    pPrintList decs = foldl (<>) empty $ intersperse (text "\n\n") $ map pPrint decs
+    prettyList decs = foldl (<>) empty $ intersperse (text "\n\n") $ map pretty decs
 
-    pPrint (FunctionDecl ident sig body) = text "func" <+> 
+    pretty (FunctionDecl ident sig body) = text "func" <+> 
       text ident <> 
-      (pPrint sig) <+> 
+      (pretty sig) <+> 
       case body of 
         Nothing -> empty
-        Just s -> (pPrint s)
-    pPrint (Decl s) = pPrint s
+        Just s -> (pretty s)
+    pretty (Decl s) = pretty s
 
   instance Pretty TypeSpec where
-    pPrint (TypeSpec ident tp) = (text ident) <+> (pPrint tp)
+    pretty (TypeSpec ident tp) = (text ident) <+> (pretty tp)
 
   instance Pretty VarSpec where
-    pPrint (VarSpec idents vals tp) = (text $ intercalate ", " idents) <+> (pPrint tp) <+> (
+    pretty (VarSpec idents vals tp) = (text $ intercalate ", " idents) <+> (pretty tp) <+> (
       if (length vals) > 0
-      then (text "=") <+> (pPrint vals)
+      then (text "=") <+> (pretty vals)
       else empty)
   instance Pretty Signature where
-    pPrint (Signature params ret) = (parens $ pPrint params) <> (pPrint ret)
+    pretty (Signature params ret) = (parens $ pretty params) <> (pretty ret)
 
   instance Pretty Parameter where
-    pPrintList params = foldl (<>) empty $ intersperse (text ", ") $ map pPrint params
-    pPrint (Parameter idents tp) = text (intercalate ", " idents) <+> (pPrint tp)
+    prettyList params = foldl (<>) empty $ intersperse (text ", ") $ map pretty params
+    pretty (Parameter idents tp) = text (intercalate ", " idents) <+> (pretty tp)
   
   instance Pretty Statement where
-    pPrint (Return exps) = text "return" -- not done
-    pPrint (If stmt exp left right) = text "if" <+> 
+    pretty (Return exps) = text "return" -- not done
+    pretty (If stmt exp left right) = text "if" <+> 
       (case stmt of
         Nothing -> empty
-        Just a  -> (pPrint a <+> text ";")) <+>
-      (pPrint exp) <+> 
-      (braces (pPrint left))
-    pPrint (For cond body) = text "for" <+> (pPrint cond) <+> (pPrint body)
-    pPrint Continue = text "continue"
-    pPrint Break = text "break"
-    pPrint (Block stmt) = braces $ (nest 2 (pPrint stmt))
-    pPrint (ExpressionStmt exp) = pPrint exp
-    pPrint (Inc exp) = (pPrint exp)<> text "++"
-    pPrint (Dec exp) = (pPrint exp)<> text "--"
-    pPrint (Assignment op lhs rhs) = (pPrint lhs) <+>(pPrint op) <+>(pPrint rhs)
-    pPrint (ShortDecl lhs rhs) = (text $ intercalate ", " lhs) <+> (text ":=") <+> (pPrint rhs)
-    pPrint Empty = empty
-
-    pPrint (TypeDecl fields) = text "type" <+>
-      (pPrint fields)
-
-    pPrint (VarDecl vars) = text "var" <+>
-      (pPrint vars)
+        Just a  -> (pretty a <+> text ";")) <+>
+      (pretty exp) <+> 
+      ((pretty left))
+    pretty (For cond body) = text "for" <+> (pretty cond) <+> (pretty body)
+    pretty Continue = text "continue"
+    pretty Break = text "break"
+    pretty (Block stmt) = braces $ (nest 2 (pretty stmt))
+    pretty (ExpressionStmt exp) = pretty exp
+    pretty (Inc exp) = (pretty exp)<> text "++"
+    pretty (Dec exp) = (pretty exp)<> text "--"
+    pretty (Assignment Eq lhs rhs) = (pretty lhs) <+> (char '=') <+> (pretty rhs)
+    pretty (Assignment op lhs rhs) = (pretty lhs) <+> (pretty op) <> (char '=') <+> (pretty rhs)
+    pretty (ShortDecl lhs rhs) = (text $ intercalate ", " lhs) <+> (text ":=") <+> (pretty rhs)
+    pretty Empty = empty
+    pretty (TypeDecl fields) = text "type" <+>
+      (pretty fields)
+    pretty (VarDecl vars) = text "var" <+> (if length vars == 1
+      then pretty (head vars)
+      else parens $ nest 2 $ pretty vars)
 
   instance Pretty ForCond where
-    pPrint (Condition exp) = pPrint exp
-    pPrint (ForClause low cond nxt) = (pPrint low) <> (char ';') <+> (pPrint cond) <> (char ';') <+> (pPrint nxt)
+    pretty (Condition exp) = pretty exp
+    pretty (ForClause low cond nxt) = (pretty low) <> (char ';') <+> (pretty cond) <> (char ';') <+> (pretty nxt)
 
   instance Pretty Type where
-    pPrint (TypeName ident) = text ident
-    pPrint (Array exp tp) = (brackets $ pPrint exp) <> (pPrint tp)
-    pPrint (Struct decls) = text "struct" <+> (braces $ nest 2 $ pPrint decls)
-    --pPrint (Pointer tp) = text "*" <> (pPrint tp)
-    pPrint (Function sig) = text "func" <> (pPrint sig)
-    pPrint (Interface fields) = text "interfaces" <+> (braces $ pPrint fields)
-    pPrint (Slice tp) = text "[]" <> (pPrint tp)
-    pPrint TInteger = text "int"
-    pPrint TFloat = text "float64"
-    pPrint TString = text "string"
-    pPrint TRune = text "rune"
-    pPrint TBool = text "bool"
+    pretty (TypeName ident) = text ident
+    pretty (Array exp tp) = (brackets $ pretty exp) <> (pretty tp)
+    pretty (Struct decls) = text "struct" <+> (braces $ nest 2 $ pretty decls)
+    --pretty (Pointer tp) = text "*" <> (pretty tp)
+    pretty (Function sig) = text "func" <> (pretty sig)
+    pretty (Interface fields) = text "interfaces" <+> (braces $ pretty fields)
+    pretty (Slice tp) = text "[]" <> (pretty tp)
+    pretty TInteger = text "int"
+    pretty TFloat = text "float64"
+    pretty TString = text "string"
+    pretty TRune = text "rune"
+    pretty TBool = text "bool"
 
   instance Pretty FieldDecl where
-    pPrint (NamedField nm tp t) = (foldl (<>) empty $ intersperse (text ", ") $ map text nm) <+> (pPrint tp) <+> (
+    pretty (NamedField nm tp t) = (foldl (<>) empty $ intersperse (text ", ") $ map text nm) <+> (pretty tp) <+> (
       case t of 
         Nothing -> empty
-        Just a -> pPrint a)
-    pPrint (AnonField tp t)  = (pPrint tp) <+> (pPrint t)
+        Just a -> pretty a)
+    pretty (AnonField tp t)  = (pretty tp) <+> (pretty t)
 
   instance Pretty MethodSpec where
-    pPrint a = empty
+    pretty a = empty
 
   instance Pretty Expression where
-    pPrint (BinaryOp op lhs rhs) = (pPrint lhs) <+> (pPrint op) <+> (pPrint rhs)
-    pPrint (UnaryOp op exp) = (pPrint op) <> (pPrint exp)
-    pPrint (Conversion tp exp) = (pPrint tp) <> (parens $ pPrint exp)
-    pPrint (Selector exp ident) = (pPrint exp) <> (char '.') <> (text ident)
-    pPrint (Index exp ind)  = (pPrint exp) <> (brackets $ pPrint ind)
-    pPrint (SimpleSlice sliced lower upper) = (pPrint sliced) <> (brackets $ (pPrint lower) <> (char ':') <> (pPrint upper))
-    pPrint (FullSlice sliced lower upper dir) = (pPrint sliced) <> (brackets $ (pPrint lower) <> (char ':') <> (pPrint upper) <> (char ':') <> (pPrint dir))
-    --pPrint TypeAssertion tp -- not done
-    pPrint (Name ident) = text ident
-    pPrint (QualName pkg ident) = (text pkg) <> (char '.') <> (text ident)
-    pPrint (Integer val) = int val
-    pPrint (Rune ch) = char ch
-    pPrint (Float val) = float val
-    pPrint (RawString str) = rawString ( str)
-    pPrint (IntString str) = intString ( str)
-    pPrint (Arguments expr args) = (pPrint expr) <> (parens $ pPrint args)
+    prettyList exps = foldl (<>) empty $ intersperse (text ", ") $ map pretty exps
+
+    pretty (BinaryOp op lhs rhs) = (pretty lhs) <+> (pretty op) <+> (pretty rhs)
+    pretty (UnaryOp op exp) = (pretty op) <> (pretty exp)
+    pretty (Conversion tp exp) = (pretty tp) <> (parens $ pretty exp)
+    pretty (Selector exp ident) = (pretty exp) <> (char '.') <> (text ident)
+    pretty (Index exp ind)  = (pretty exp) <> (brackets $ pretty ind)
+    pretty (SimpleSlice sliced lower upper) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper))
+    pretty (FullSlice sliced lower upper dir) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper) <> (char ':') <> (pretty dir))
+    --pretty TypeAssertion tp -- not done
+    pretty (Name ident) = text ident
+    pretty (QualName pkg ident) = (text pkg) <> (char '.') <> (text ident)
+    pretty (Integer val) = int val
+    pretty (Rune ch) = char ch
+    pretty (Float val) = float val
+    pretty (RawString str) = rawString ( str)
+    pretty (IntString str) = intString ( str)
+    pretty (Arguments expr args) = (pretty expr) <> (parens $ pretty args)
 
   instance Pretty BinOp where
-    pPrint op = text (fst.head $ filter (\(el) -> (snd el) == op) binaryOps)
+    pretty op = text (fst.head $ filter (\(el) -> (snd el) == op) binaryOps)
   instance Pretty UOp where
-    pPrint op = text (fst.head $ filter (\el -> (snd el) == op) unaryOps)
+    pretty op = text (fst.head $ filter (\el -> (snd el) == op) unaryOps)
