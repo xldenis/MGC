@@ -67,6 +67,7 @@ test-suite tests
   build-depends:      mgc,
                       base >=4.7,
                       parsec >= 3.0,
-                      hspec,
+                      hspec >= 2.1,
                       hspec-expectations,
+                      bytestring == 0.10.4.0,
                       neat-interpolation
