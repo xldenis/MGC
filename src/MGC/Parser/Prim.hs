@@ -125,6 +125,7 @@ module MGC.Parser.Prim where
     case len of 
       'U' ->  ((++) "\\U") <$> count 8 hexDigit
       'u' ->  ((++) "\\u") <$> count 4 hexDigit
+      _ -> fail "invalid unicode escape"
 
   escapeSeq :: Parser String
   escapeSeq = try $ (char '\\') *> liftM ((:) '\\' . (flip (:) [])) (oneOf "abfnrtv\\'\"")
@@ -171,3 +172,7 @@ module MGC.Parser.Prim where
     dec <- many1 digit
     exp <- (try $ (:) <$> (oneOf "eE") <*> ((:) <$> (oneOf "+-") <*> (many digit))) <|> (return "")
     return $ (Float .fst.head.readFloat) ("0." ++ dec ++ exp)
+
+  boolLit :: Parser Expression 
+  boolLit  = try $ 
+    (string "true" >> (return $ Bool True)) <|> (string "false" >> (return $ Bool False))

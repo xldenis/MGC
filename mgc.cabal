@@ -29,7 +29,7 @@ library
 
   build-depends:       base >=4.7 && <4.8,
                        parsec >= 3.0,
-                       pretty >= 1.1.2.1,
+                       pretty >= 1,
                        mtl
 
   hs-source-dirs:      src
@@ -45,7 +45,7 @@ executable mgc
   build-depends:       mgc,
                        base >=4.7 && <4.8,
                        parsec >= 3.0,
-                       pretty >= 1.1.2.1,
+                       pretty >= 1,
                        filepath,
                        cmdargs,
                        mtl
@@ -60,13 +60,17 @@ executable mgc
 test-suite tests
   default-language:   Haskell2010
   ghc-options:        -Wall
+                      -fno-warn-missing-signatures 
+                      -fwarn-incomplete-patterns 
+                      -fno-warn-name-shadowing
+                      -fno-warn-unused-do-bind
   default-extensions: OverloadedStrings
   type:               exitcode-stdio-1.0
   main-is:            Test.hs
   hs-source-dirs:     test, src
   build-depends:      base >=4.7,
                       parsec >= 3.0,
-                      hspec >= 2.1,
+                      hspec >= 2.1.4,
                       hspec-expectations,
                       bytestring == 0.10.4.0,
                       neat-interpolation

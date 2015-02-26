@@ -39,7 +39,7 @@ module MGC.Parser.Expression  where
   op s = try $ string s >> notFollowedBy (oneOf opLetter) >> lineSpace
 
   expression :: Parser Expression
-  expression = buildExpressionParser table primaryExpr <?> "Expression"
+  expression = try (buildExpressionParser table primaryExpr <?> "Expression")
 
   primaryExpr :: Parser Expression
   primaryExpr = (operand) <* lineSpace
@@ -57,7 +57,7 @@ module MGC.Parser.Expression  where
   selector = try $ do{lexeme' "."; i <- identifier;  return $ (flip Selector) i}
 
   index :: Parser (Expression -> Expression)
-  index = try $ liftM (flip Index) (brackets expression)
+  index = try $ liftM (flip Index) (brackets expression <* lineSpace)
 
   slice :: Parser (Expression -> Expression)
   slice = try $ brackets $ do 

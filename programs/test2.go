@@ -15,4 +15,11 @@ func main() {
     x1, x2 = x2, x1+x2
     println(x1)
   }
+  for ;; {
+
+  }
+  for ;x; {
+
+  }
+  if a[x] {}
 }

@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+
 module MGC.Syntax.Pretty where
   --import Text.PrettyPrint.HughesPJClass
   import MGC.Syntax
@@ -48,7 +50,7 @@ module MGC.Syntax.Pretty where
   a <> EmptyDoc = a
   EmptyDoc <> a = a
   (Doc int s) <> (Doc _ t) = Doc int (s++t)
-  (HUnion in1 s) <> (VUnion in2 t) = HUnion in1 $ s ++ [(head t), (VUnion in2 (tail t))]
+  (HUnion in1 s) <> (VUnion in2 t) = VUnion in1 $ (HUnion 0 $ s ++ [head t]) : (map (nest (in2 - in1)) $ tail t)
   (HUnion in1 s) <> b@(Doc _ _) = HUnion in1 (s++[b])
   (HUnion in1 s) <> (HUnion _ t) = HUnion in1 (s++t)
   a <> b = HUnion 0 [a,b]
@@ -63,24 +65,31 @@ module MGC.Syntax.Pretty where
   (HUnion in1 s) <+> c = HUnion in1 $ s ++ [char ' ', c]
 
   ($$) :: Doc -> Doc -> Doc
+  a $$ (VUnion _ []) = a
   (Doc in1 s) $$ a = VUnion in1 ((Doc 0 s):[a])
   (VUnion in1 s) $$ a  = VUnion in1 (s++[a])
-
+  a $$ b = VUnion 0 [a,b]
   empty :: Doc
   empty = EmptyDoc
 
   nest n (Doc ind txt) = Doc (ind+n) txt
   nest n (VUnion ind lst) = VUnion (ind+n) lst
+  nest n (HUnion ind lst) = HUnion (ind+n) lst
+  nest n EmptyDoc = EmptyDoc
     
   braces :: Doc -> Doc
   braces d = (char '{') $$ d $$ (char '}')
+
+  braces' :: Doc -> Doc
+  braces' d = (char '{') <+> d <+> (char '}')
 
   brackets :: Doc -> Doc
   brackets d = (char '[') <> d <> (char ']')
 
   parens :: Doc -> Doc
   parens d = (char '(') <> d <> (char ')')
-
+  parens' :: Doc -> Doc
+  parens' d = (char '(') $$ d $$ (char ')')
   quotes :: Doc -> Doc
   quotes d = (char '"') <> d <> (char '"')
 
@@ -90,10 +99,13 @@ module MGC.Syntax.Pretty where
   int :: Int -> Doc
   int i = Doc 0 (show i)
 
+  bool :: Bool -> Doc
+  bool True  = (Doc 0 "true")
+  bool False = (Doc 0 "false")
   prettyShow :: Doc -> String
   prettyShow = prettyShow' 0
-
-  prettyShow' n (VUnion ind stmts) = "\n" ++ (intercalate "\n" $ map (prettyShow' $ n+ind) stmts)
+  prettyShow' _ (VUnion _ []) = ""
+  prettyShow' n (VUnion ind stmts) =  (intercalate "\n" $ map (prettyShow' $ n+ind) stmts)
   prettyShow' n (Doc ind stmt) = (replicate (n + ind) ' ')++ stmt
   prettyShow' n (HUnion ind s) = (prettyShow' (ind+n) (head s)) ++ (concatMap (prettyShow' 0) (tail s))
   prettyShow' _ EmptyDoc = ""
@@ -128,14 +140,18 @@ module MGC.Syntax.Pretty where
     pretty (Parameter idents tp) = text (intercalate ", " idents) <+> (pretty tp)
   
   instance Pretty Statement where
-    pretty (Return exps) = text "return" -- not done
+    pretty (Return exps) = text "return" <+> pretty exps-- not done
     pretty (If stmt exp left right) = text "if" <+> 
       (case stmt of
         Nothing -> empty
         Just a  -> (pretty a <+> text ";")) <+>
       (pretty exp) <+> 
-      ((pretty left))
+      (pretty left) <+> 
+      (case right of
+        Empty -> empty
+        _ -> text "else" <+> pretty right)
     pretty (For cond body) = text "for" <+> (pretty cond) <+> (pretty body)
+    pretty (Switch s e body) = text "switch" <+> (pretty s) <+> (pretty e) <+> (pretty body)
     pretty Continue = text "continue"
     pretty Break = text "break"
     pretty (Block stmt) = braces $ (nest 2 (pretty stmt))
@@ -150,7 +166,10 @@ module MGC.Syntax.Pretty where
       (pretty fields)
     pretty (VarDecl vars) = text "var" <+> (if length vars == 1
       then pretty (head vars)
-      else parens $ nest 2 $ pretty vars)
+      else parens' $ nest 2 $ pretty vars)
+
+  instance Pretty SwitchClause where
+    pretty (Nothing, body) = text "default:" $$ (nest 2 $ pretty body) 
 
   instance Pretty ForCond where
     pretty (Condition exp) = pretty exp
@@ -159,7 +178,10 @@ module MGC.Syntax.Pretty where
   instance Pretty Type where
     pretty (TypeName ident) = text ident
     pretty (Array exp tp) = (brackets $ pretty exp) <> (pretty tp)
-    pretty (Struct decls) = text "struct" <+> (braces $ nest 2 $ pretty decls)
+    pretty (Struct []) = text "struct{}"
+    pretty (Struct decls) = text "struct" <> (if length decls == 1
+      then braces' $ pretty (head decls)
+      else braces $ nest 2 $ pretty decls)
     --pretty (Pointer tp) = text "*" <> (pretty tp)
     pretty (Function sig) = text "func" <> (pretty sig)
     pretty (Interface fields) = text "interfaces" <+> (braces $ pretty fields)
@@ -196,6 +218,7 @@ module MGC.Syntax.Pretty where
     pretty (Integer val) = int val
     pretty (Rune ch) = char ch
     pretty (Float val) = float val
+    pretty (Bool val) = bool val
     pretty (RawString str) = rawString ( str)
     pretty (IntString str) = intString ( str)
     pretty (Arguments expr args) = (pretty expr) <> (parens $ pretty args)

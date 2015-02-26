@@ -2,3 +2,5 @@ dist/
 .cabal-sandbox/
 .DS_Store
 .mgc.sublime*
+*.pretty.go
+*.config

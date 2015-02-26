@@ -51,21 +51,19 @@ module MGC.Parser where
   varDec :: Parser Statement
   varDec = try $ do
     lexeme "var"
-    VarDecl <$> ((flip (:) []) <$> varSpec <|> (parens' $ (varSpec `sepEndBy` semi')))
+    VarDecl <$> ((flip (:) []) <$> varSpec <* semi' <|> (parens' $ (varSpec `sepEndBy` semi')))
 
   varSpec = try $ do
     idents <- identifierList
 
-    tp <- (\x -> case x of
-      Just t -> t
-      Nothing -> Unit) <$> optionMaybe typeParser
+    tp <- optionMaybe typeParser
     exprs <- (try $ lexeme "=" *> expressionList) <|> (return [])
     return $ VarSpec idents exprs tp
 
   statement :: Parser Statement
   statement = varDec <|> typeDec <|> simpleStatement <|> returnStmt <|> ifStmt <|> 
     switchStmt <|> forStmt <|> blockStmt <|> breakStmt <|> 
-    contStmt <|> ((return Empty) <* (char ';' <* fullSpace))
+    contStmt <|> ((return Empty) <* (char ';' >> fullSpace))
 
   returnStmt :: Parser Statement
   returnStmt = do
@@ -105,17 +103,22 @@ module MGC.Parser where
   forStmt :: Parser Statement
   forStmt = do
     reserved "for"
-    cond <- optionMaybe $ forClause <|> (try $ Condition <$> expression)
+    cond <- ((try $ semi >> semi) >> (return $ Nothing)) <|>
+      (optionMaybe $ forClause 
+        <|> (try $ Condition <$> expression) 
+        <|> (try $ Condition <$> between (semi) (semi) expression))
+
+
     body <- blockStmt
     return $ For cond body
 
   forClause :: Parser ForCond
   forClause = try $ do
-    initStmt <- simpleStatement
+    initStmt <- simpleStatement <|> (lookAhead (try $ char ';') >> return Empty)
     semi
     cond <- expression
     semi
-    postStmt <- simpleStatement
+    postStmt <- simpleStatement <|> (lookAhead (try $ char ';') >> return Empty)
     return $ ForClause initStmt cond postStmt
 
   blockStmt :: Parser Statement

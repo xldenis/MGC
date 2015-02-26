@@ -15,7 +15,7 @@ module MGC.Syntax where
 
   data TypeSpec = TypeSpec Identifier Type deriving (Show, Eq)
 
-  data VarSpec = VarSpec [Identifier] [Expression] Type  deriving (Show, Eq)
+  data VarSpec = VarSpec [Identifier] [Expression] (Maybe Type)  deriving (Show, Eq)
 
   data Expression 
    = BinaryOp BinOp Expression Expression
@@ -33,6 +33,7 @@ module MGC.Syntax where
    | Rune Char
    | Float Float
    | IntString String 
+   | Bool Bool
    | RawString String deriving (Show, Eq)
 
   data BinOp 
@@ -79,8 +80,7 @@ module MGC.Syntax where
     | TFloat
     | TString
     | TRune
-    | TBool
-    | Unit  deriving (Show, Eq)
+    | TBool deriving (Show, Eq)
 
 
   data FieldDecl  = NamedField [Identifier] Type (Maybe  Expression) | AnonField Type (Maybe Expression) deriving (Show, Eq)

@@ -31,6 +31,9 @@ module MGC.Parser.ExpressionSpec (spec) where
     describe "slice" $ do
       it "parses constant indices" $ do
         pending
+    describe "index" $ do
+      it "parses arrays" $ do
+        expression `parses` "array[x-1]" ~> (Index (Name "array") (BinaryOp Minus (Name "x") (Integer 1)))
     describe "selector" $ do
       it "parses `(0).method`" $ do
         expression `parses` "(0).method " ~> Selector (Integer 0) "method"
