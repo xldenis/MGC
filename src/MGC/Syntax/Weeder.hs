@@ -2,7 +2,7 @@
 module MGC.Syntax.Weeder where
   import MGC.Syntax
   import Control.Applicative ((<$>))
-  import Control.Monad (liftM, liftM2, liftM3, mapM)
+  import Control.Monad (liftM, liftM2, liftM3, liftM4, mapM)
   import Control.Monad.Except
 
   class Weedable a where
@@ -15,15 +15,14 @@ module MGC.Syntax.Weeder where
     = MultipleDefault
     | EmptyFuncBody
     | InvalidTopLevelDecl
+    | InvalidPackageName
+    | InvalidContinue
+    | AssignSizeDifferent
+    | InvalidBreak deriving Show
 
-  --weedTLD :: TopLevelDeclaration -> Except TopLevelDeclaration
-  --weedTLD (FunctionDecl iden sig (Just stmt)) = 
-  --weedTLD (FunctionDecl iden sig (Nothing)) =
-  --weedTLD (Decl ())
-  --weedTLD (Decl ())
-  --weedTLD (Decl _ )
-
-  pIdent = return
+  pIdent s = case (s == "_") of
+    True -> (throwError InvalidPackageName)
+    _ -> return s
 
   instance Weedable Package where
     weed (Package iden tlds) = liftM2 Package (pIdent iden) (weed tlds)
@@ -37,7 +36,32 @@ module MGC.Syntax.Weeder where
 
   instance Weedable Statement where 
     weed (Switch s e bdy) = liftM3 Switch (weed s) (weed e) (weed bdy)
-    weed a = Right a
+    weed (For _ bdy) = weed' bdy
+    weed (Continue) = throwError InvalidContinue
+    weed (Break) = throwError InvalidBreak
+    weed (If s e l r) = liftM4 If (weed s) (weed e) (weed l) (weed r)
+    weed (Block bdy) = Block <$> (weed bdy) 
+    weed (Return e) = Return <$> (weed e) 
+    weed (Empty) = return Empty
+    weed (ExpressionStmt e) = ExpressionStmt <$> (weed e)
+    weed a@(TypeDecl _) = return a
+    weed a@(VarDecl _)  = return a
+    weed (Inc e) = Inc <$> (weed e)
+    weed (Dec e) = Dec <$> (weed e)
+    weed (ShortDecl lh rh) = if (length lh) == (length rh)
+      then liftM (ShortDecl lh) (weed rh)
+      else throwError AssignSizeDifferent
+    weed (Assignment op lh rh) = if (length lh) == (length rh)
+      then liftM2 (Assignment op) (weed lh) (weed rh)
+      else throwError AssignSizeDifferent
+
+  weed' :: Statement -> Either WeederError Statement
+  weed' (Continue) = return Continue
+  weed' (Break) = return Break
+  weed' (If s e l r) = liftM4 If (weed s) (weed e) (weed' l) (weed' r)
+  weed' (Block bdy) = Block <$> (mapM weed' bdy) 
+  weed' (For _ bdy) = weed' bdy
+  weed' a = return a
 
   instance Weedable SwitchClause where
     weedList cls = do

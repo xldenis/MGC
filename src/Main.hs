@@ -5,6 +5,7 @@ import System.FilePath.Posix
 import System.Console.CmdArgs
 
 import MGC.Syntax.Pretty
+import MGC.Syntax.Weeder (weed)
 
 import Control.Applicative ((<$>), (<*))
 
@@ -20,9 +21,11 @@ main = do
   ast  <- (parse (package <* eof) "") <$> readFile (fname)
   case ast of 
     Left a -> putStrLn $ show a
-    Right ast -> do 
-      case (astPrint args) of
-        True -> putStrLn $ show $ ast
-        _ -> return ()
-      putStrLn $ prettyShow $ pretty ast
-      writeFile (replaceExtension (fname) "pretty.go") $ prettyShow $ pretty ast
+    Right ast -> case weed ast of 
+      Left err -> putStrLn $ show err
+      Right ast -> do
+        case (astPrint args) of
+          True -> putStrLn $ show $ ast
+          _ -> return ()
+        putStrLn $ prettyShow $ pretty ast
+        writeFile (replaceExtension (fname) "pretty.go") $ prettyShow $ pretty ast
