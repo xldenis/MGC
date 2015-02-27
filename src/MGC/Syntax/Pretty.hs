@@ -161,6 +161,7 @@ module MGC.Syntax.Pretty where
     pretty (Assignment Eq lhs rhs) = (pretty lhs) <+> (char '=') <+> (pretty rhs)
     pretty (Assignment op lhs rhs) = (pretty lhs) <+> (pretty op) <> (char '=') <+> (pretty rhs)
     pretty (ShortDecl lhs rhs) = (text $ intercalate ", " lhs) <+> (text ":=") <+> (pretty rhs)
+    pretty (Fallthrough) = text "fallthrough"
     pretty Empty = empty
     pretty (TypeDecl fields) = text "type" <+>
       (pretty fields)

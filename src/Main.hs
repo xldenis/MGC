@@ -9,16 +9,21 @@ import MGC.Syntax.Weeder (weed)
 
 import Control.Applicative ((<$>), (<*))
 
-data Options = Options {astPrint :: Bool, files :: [String]} deriving (Show, Data, Typeable)
+data Options = Options {astPrint :: Bool, files :: [String], test :: Bool } deriving (Show, Data, Typeable)
 
 
-opts = Options{astPrint = False &= help "Print ast info", files = [] &= args }
+opts = Options{astPrint = False &= help "Print ast info", test = False &= help "Test directories", files = [] &= args }
+
 main :: IO ()
 main = do
   args <- cmdArgs opts
-  let fname = head (files args)
+  case (test args) of
+    False -> compile (head $ files args) args
+    True  -> (mapM handleFile (files args)) >> (return ())
 
-  ast  <- (parse (package <* eof) "") <$> readFile (fname)
+compile :: String -> Options -> IO ()
+compile fname args = do
+  ast <- (parse (package <* eof) "") <$> readFile (fname)
   case ast of 
     Left a -> putStrLn $ show a
     Right ast -> case weed ast of 
@@ -29,3 +34,15 @@ main = do
           _ -> return ()
         putStrLn $ prettyShow $ pretty ast
         writeFile (replaceExtension (fname) "pretty.go") $ prettyShow $ pretty ast
+
+handleFile :: String -> IO ()
+handleFile fname = do
+  ast  <- (parse (package <* eof) "") <$> readFile (fname)
+  case ast of 
+    Left a -> putStrLn $ fname ++ " got ParseError"
+    Right ast -> case weed ast of 
+      Left err -> putStrLn $ fname ++ " got " ++ (show err)
+      Right _ -> do
+        putStrLn $ fname ++ " " ++ "parsed"
+        --putStrLn $ prettyShow $ pretty ast
+        --writeFile (replaceExtension (fname) "pretty.go") $ prettyShow $ pretty ast

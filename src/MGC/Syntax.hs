@@ -53,6 +53,7 @@ module MGC.Syntax where
     | For (Maybe ForCond) Statement
     | Continue
     | Break
+    | Fallthrough
     | Block [Statement]
     | Empty
     | ExpressionStmt Expression
@@ -69,10 +70,10 @@ module MGC.Syntax where
 
   data Type 
     = TypeName Identifier 
-    | QualTypeName Identifier Identifier
+    -- | QualTypeName Identifier Identifier
     | Array Expression Type 
     | Struct [FieldDecl]
-    | Pointer Type 
+    -- | Pointer Type 
     | Function Signature
     | Interface [MethodSpec] 
     | Slice Type 

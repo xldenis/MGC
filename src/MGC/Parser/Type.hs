@@ -14,7 +14,7 @@ module MGC.Parser.Type  where
   typeName = TypeName <$> (try $ reservedType)
 
   typeLit :: Parser Type
-  typeLit = builtins <|> arrayType <|> functionType <|> pointerType <|> interfaceType <|> sliceType <|> structType
+  typeLit = builtins <|> arrayType <|> functionType  <|> interfaceType <|> sliceType <|> structType -- <|> pointerType
 
   arrayType :: Parser Type
   arrayType = try $ Array <$> (brackets expression) <*> typeParser
@@ -42,10 +42,10 @@ module MGC.Parser.Type  where
 
   anonField = try $ (AnonField <$> ((optional $ (char '*')) *> typeName) <*> tag)
 
-  pointerType :: Parser Type
-  pointerType = try $ do 
-    char '*'
-    Pointer <$> typeParser
+  --pointerType :: Parser Type
+  --pointerType = try $ do 
+  --  char '*'
+  --  Pointer <$> typeParser
 
   functionType :: Parser Type
   functionType = try $ do

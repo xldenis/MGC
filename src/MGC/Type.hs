@@ -6,12 +6,30 @@ module MGC.Type where
 
   type Env = [Map (String, Type)]
 
+  data TypeError = TypeError
 
-  Check e w a = ExceptT e (Writer w) a
+  type Check = ExceptT TypeError (State (String, Env))
 
-  typecheck :: Env -> [TopLevelDeclaration] -> Check Type String TypeError
-  typecheck = return TInt
+  --checkTLD :: Env -> [TopLevelDeclaration] -> Check Type String TypeError
+  --checkTLD (Decl (TypeDecl decls)) =
+  --checkTLD (Decl (VarDecl  decls)) =  
+  --checkTLD (FunctionDecl name sig body) =
+  --checkTLD (Decl _) = -- fuck dat shit
 
-  checkStmt :: Env -> Statement -> Check Type String TypeError
+  checkStmt :: Statement -> Check Type String TypeError
 
-  checkExpr :: Env -> Expression -> Check Type String TypeError
+  checkExpr :: Expression () -> Check (Expression Type)
+
+
+  lookup :: String -> Check Type
+  lookup var = do
+    (log, env) <- get
+    case env of
+      [] -> 
+      case lookup x var of
+        Nothing -> lookup xs var
+        (Just t) -> t
+
+  pushScope :: Env -> Env
+
+  popScope  :: Env -> Env

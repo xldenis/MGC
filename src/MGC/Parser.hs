@@ -62,7 +62,7 @@ module MGC.Parser where
 
   statement :: Parser Statement
   statement = varDec <|> typeDec <|> simpleStatement <|> returnStmt <|> ifStmt <|> 
-    switchStmt <|> forStmt <|> blockStmt <|> breakStmt <|> 
+    switchStmt <|> forStmt <|> blockStmt <|> breakStmt <|> fallthroughStmt <|>
     contStmt <|> ((return Empty) <* (char ';' >> fullSpace))
 
   returnStmt :: Parser Statement
@@ -74,14 +74,17 @@ module MGC.Parser where
   breakStmt = (reserved "break" <* semi') *> return Break
 
   contStmt :: Parser Statement
-  contStmt = (reserved "continue" <* semi') *> return Break
-
+  contStmt = (reserved "continue" <* semi') *> return Continue
+  
+  fallthroughStmt :: Parser Statement
+  fallthroughStmt = (reserved "fallthrough" <* semi') *> return Fallthrough
+  
   ifStmt :: Parser Statement
   ifStmt = do
     reserved "if"  
     stmt <- optionMaybe (try $ simpleStatement <* semi)
     expr <- expression
-    left <- blockStmt
+    left <- Block <$> (braces' $ statement `sepEndBy` (semi'))
     right <- (reserved "else" >> (ifStmt <|> blockStmt)) <|> return Empty
     return $ If stmt expr left right
 

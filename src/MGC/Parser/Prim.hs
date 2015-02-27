@@ -28,6 +28,9 @@ module MGC.Parser.Prim where
   braces :: Parser a -> Parser a
   braces = between (lexeme' "{") (lexeme' "}")
 
+  braces' :: Parser a -> Parser a
+  braces' = between (lexeme' "{") (lexeme "}")
+
   quotes :: Parser a -> Parser a
   quotes = between (char '"') (char '"')
 
