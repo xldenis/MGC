@@ -19,8 +19,7 @@ module MGC.Parser.Expression  where
 
 
   table = [
-     [ Postfix (selector), Postfix (index), Postfix (slice)]
-   , (map (\(s,tp) -> prefix s tp) unaryOps)
+     (map (\(s,tp) -> prefix s tp) unaryOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) mulOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) addOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) relOps)
@@ -39,8 +38,8 @@ module MGC.Parser.Expression  where
   op s = try $ do 
     o <- string s
     case o of
-      "+" -> notFollowedBy (oneOf $opLetter ++ "+")
-      "-" -> notFollowedBy (oneOf $opLetter ++ "-")
+      "+" -> notFollowedBy (oneOf $ opLetter ++ "+")
+      "-" -> notFollowedBy (oneOf $ opLetter ++ "-")
       _  -> notFollowedBy (oneOf opLetter)
     lineSpace
 
@@ -48,10 +47,19 @@ module MGC.Parser.Expression  where
   expression = try (buildExpressionParser table primaryExpr <?> "Expression")
 
   primaryExpr :: Parser Expression
-  primaryExpr = (operand) <* lineSpace
+  primaryExpr = try $ do 
+    op <- operand
+    consumePrimaryExpr op
+
+  consumePrimaryExpr :: Expression -> Parser Expression
+  consumePrimaryExpr e = try $ do
+    res <- optionMaybe ((selector e) <|> (index e))
+    case res of 
+      Nothing -> return e
+      Just x -> consumePrimaryExpr x
 
   operand :: Parser Expression
-  operand = literal <|>  args <|> name <|> conversion <|> (parens expression)
+  operand = (literal <|>  args <|> name <|> conversion <|> (parens expression)) <* lineSpace
 
   name :: Parser Expression
   name = (Name <$> identifier) <|> (QualName <$> identifier <*> identifier)
@@ -59,21 +67,21 @@ module MGC.Parser.Expression  where
   conversion :: Parser Expression
   conversion = try $ Conversion <$>  typeParser <*> (parens $ expression <* (optional $ lexeme "," ))
 
-  selector :: Parser (Expression -> Expression)
-  selector = try $ do{lexeme' "."; i <- identifier;  return $ (flip Selector) i}
+  selector :: Expression -> Parser Expression
+  selector e = try $ do{lexeme' "."; i <- identifier;  return $ Selector e i}
 
-  index :: Parser (Expression -> Expression)
-  index = try $ liftM (flip Index) (brackets expression <* lineSpace)
+  index :: Expression -> Parser Expression
+  index e = try $ liftM (Index e) (brackets expression <* lineSpace)
 
-  slice :: Parser (Expression -> Expression)
-  slice = try $ brackets $ do 
+  slice :: Expression -> Parser Expression
+  slice e = try $ brackets $ do 
     e1 <- expression 
     lexeme ":"
     e2 <- expression
     a <- optionMaybe (lexeme ":" *> expression)
     case a of
-      Just e3 -> return $ (\x -> FullSlice x e1 e2 e3)
-      Nothing -> return $ (\x -> SimpleSlice x e1 e2)
+      Just e3 -> return $ (FullSlice e e1 e2 e3)
+      Nothing -> return $ (SimpleSlice e e1 e2)
 
   args :: Parser (Expression)
   args = try $ Arguments <$> (Name <$> reservedFunc) <*> parens expressionList

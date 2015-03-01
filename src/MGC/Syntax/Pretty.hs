@@ -223,7 +223,7 @@ module MGC.Syntax.Pretty where
     pretty (Name ident) = text ident
     pretty (QualName pkg ident) = (text pkg) <> (char '.') <> (text ident)
     pretty (Integer val) = int val
-    pretty (Rune ch) = char ch
+    pretty (Rune ch) = text ch
     pretty (Float val) = float val
     pretty (Bool val) = bool val
     pretty (RawString str) = rawString ( str)

@@ -116,13 +116,13 @@ module MGC.Parser.Prim where
   basicLit = floatLit <|> intLit <|> stringLit <|> runeLit
 
   runeLit :: Parser Expression
-  runeLit = Rune <$> quotes' (byteLit <|> (noneOf "'"))
+  runeLit = Rune <$> quotes' (byteLit <|> escapeSeq <|> (flip (:) [] <$> noneOf "'"))
 
-  byteLit :: Parser Char
+  byteLit :: Parser String
   byteLit = try $ do
     char '\\'
     chars <-  (((:) <$> char 'x' <*> count 2 hexDigit)) <|>(count 3 octDigit)
-    return $ (fst . head . readLitChar) ('\\':chars)
+    return $  ((:) '\\' chars)
 
   stringLit :: Parser Expression
   stringLit = try $ (quotes (interpretedString) <|> (try $ RawString <$> (ticks (many (noneOf "`")))))

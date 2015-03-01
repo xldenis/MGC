@@ -30,7 +30,7 @@ module MGC.Syntax where
    | Name Identifier
    | QualName Identifier Identifier
    | Integer Int  
-   | Rune Char
+   | Rune String
    | Float Float
    | IntString String 
    | Bool Bool
@@ -64,7 +64,7 @@ module MGC.Syntax where
     | Assignment BinOp [Expression] [Expression]
     | ShortDecl [Identifier] [Expression]  deriving (Show, Eq)
 
-  data ForCond = Condition Expression | ForClause Statement Expression Statement  deriving (Show, Eq)
+  data ForCond = Condition Expression | ForClause Statement (Maybe Expression) Statement  deriving (Show, Eq)
 
   type SwitchClause = (Maybe [Expression], [Statement])
 

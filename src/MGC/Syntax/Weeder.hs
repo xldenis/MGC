@@ -24,6 +24,8 @@ module MGC.Syntax.Weeder where
     | InvalidLValue
     | MultipleReturnValue deriving Show
 
+  data WeederState = State{rhs :: Bool, func :: Bool, funcReturn :: Bool, loop :: Bool }
+
   pIdent s = case (s == "_") of
     True -> (throwError InvalidPackageName)
     _ -> return s

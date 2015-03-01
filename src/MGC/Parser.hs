@@ -12,9 +12,17 @@ module MGC.Parser where
   import Control.Applicative ((<$>), (<*>), (<*), (*>), (<|>))
   import Control.Monad ((>>))
 
-  mulOpParser = lexeme "*" *> return Mult
+  mulOpParser = do
+    op <- many1 (oneOf $  concat (map (fst) mulOps))
+    case lookup op mulOps of
+      Just op' -> return op'
+      _ -> fail "Invalid AddOp"
 
-  addOpParser = string "+" *> return Plus
+  addOpParser = do
+    op <- many1 (oneOf $ concat (map (fst) addOps))
+    case lookup op addOps of
+      Just op' -> return op'
+      _ -> fail "Invalid AddOp"
 
   package :: Parser Package
 
@@ -51,7 +59,7 @@ module MGC.Parser where
   varDec :: Parser Statement
   varDec = try $ do
     lexeme "var"
-    VarDecl <$> ((flip (:) []) <$> (varSpec) <|> (parens' $ (varSpec `sepBy` semi')))
+    VarDecl <$> ((flip (:) []) <$> (varSpec) <|> (parens' $ (varSpec `sepEndBy` semi')))
 
   varSpec = try $ do
     idents <- identifierList
@@ -82,7 +90,7 @@ module MGC.Parser where
   ifStmt :: Parser Statement
   ifStmt = do
     reserved "if"  
-    stmt <- optionMaybe (try $ simpleStatement <* semi)
+    stmt <- optionMaybe (try $ (simpleStatement <|> (return Empty)) <* semi)
     expr <- expression
     left <- blockStmt
     right <- (reserved "else" >> (ifStmt <|> blockStmt)) <|> return Empty
@@ -106,29 +114,28 @@ module MGC.Parser where
   forStmt :: Parser Statement
   forStmt = do
     reserved "for"
-    cond <- ((try $ semi >> semi) >> (return $ Nothing)) <|>
-      (optionMaybe $ forClause 
+    cond <- (optionMaybe $ forClause 
         <|> (try $ Condition <$> expression) 
         <|> (try $ Condition <$> between (semi) (semi) expression))
-
+        <|> ((try $ semi >> semi) >> (return $ Nothing)) 
 
     body <- blockStmt
     return $ For cond body
 
   forClause :: Parser ForCond
   forClause = try $ do
-    initStmt <- simpleStatement <|> (lookAhead (try $ char ';') >> return Empty)
+    initStmt <- simpleStatement <|> (lineSpace >> lookAhead (try $ char ';') >> return Empty)
     semi
-    cond <- expression
+    cond <- optionMaybe expression
     semi
-    postStmt <- incDec <|> assign <|> opAssign <|> exprStmt
+    postStmt <- incDec <|> assign <|> opAssign <|> exprStmt <|> (lineSpace >> return Empty)
     return $ ForClause initStmt cond postStmt
 
   blockStmt :: Parser Statement
   blockStmt = Block <$> (braces' $ many statement)
 
   simpleStatement :: Parser Statement
-  simpleStatement = try $ incDec <|> assign <|> opAssign <|> shortDec <|> exprStmt
+  simpleStatement = try $ incDec <|> assign <|> shortDec <|> opAssign <|>  exprStmt
   
   exprStmt :: Parser Statement
   exprStmt = try $ ExpressionStmt <$> expression
