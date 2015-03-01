@@ -5,7 +5,7 @@ import System.FilePath.Posix
 import System.Console.CmdArgs
 
 import MGC.Syntax.Pretty
-import MGC.Syntax.Weeder (weed)
+import MGC.Syntax.Weeder (runWeeder)
 
 import Control.Applicative ((<$>), (<*))
 
@@ -26,7 +26,7 @@ compile fname args = do
   ast <- (parse (package <* eof) "") <$> readFile (fname)
   case ast of 
     Left a -> putStrLn $ show a
-    Right ast -> case weed ast of 
+    Right ast -> case runWeeder ast of 
       Left err -> putStrLn $ show err
       Right ast -> do
         case (astPrint args) of
@@ -40,7 +40,7 @@ handleFile fname = do
   ast  <- (parse (package <* eof) "") <$> readFile (fname)
   case ast of 
     Left _ -> putStrLn $ fname ++ " got ParseError"
-    Right ast -> case weed ast of 
+    Right ast -> case runWeeder ast of 
       Left err -> putStrLn $ fname ++ " got " ++ (show err)
       Right _ -> do
         putStrLn $ fname ++ " " ++ "parsed"
