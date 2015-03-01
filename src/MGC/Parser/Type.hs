@@ -8,10 +8,10 @@ module MGC.Parser.Type  where
   import Control.Applicative ((<$>), (<*>), (<*), (*>))
   
   typeParser :: Parser Type
-  typeParser = (typeLit <|> typeName <|> (parens typeParser)) <* lineSpace
+  typeParser = (typeLit <|> typeName <|> (parens typeParser)) <* lineSpace <?> "type"
 
   typeName :: Parser Type
-  typeName = TypeName <$> (try $ reservedType)
+  typeName = TypeName <$> (try $ reservedType) <?> "builtin type"
 
   typeLit :: Parser Type
   typeLit = builtins <|> arrayType <|> functionType  <|> interfaceType <|> sliceType <|> structType -- <|> pointerType
@@ -28,7 +28,7 @@ module MGC.Parser.Type  where
   structType :: Parser Type
   structType = try $ do
     reserved "struct"
-    fields <- braces $ many (fieldDecl <* semi')
+    fields <- braces' $ many (fieldDecl <* semi')
     return $ Struct fields
 
   fieldDecl = namedField <|> anonField
@@ -42,11 +42,6 @@ module MGC.Parser.Type  where
 
   anonField = try $ (AnonField <$> ((optional $ (char '*')) *> typeName) <*> tag)
 
-  --pointerType :: Parser Type
-  --pointerType = try $ do 
-  --  char '*'
-  --  Pointer <$> typeParser
-
   functionType :: Parser Type
   functionType = try $ do
     lexeme "func"
@@ -55,7 +50,7 @@ module MGC.Parser.Type  where
   interfaceType :: Parser Type
   interfaceType = try $ do
     lexeme "interface"
-    Interface <$> (braces $ many (methodSpec <* semi))
+    Interface <$> (braces' $ many (methodSpec <* semi))
 
   methodSpec :: Parser MethodSpec
   methodSpec = try $ do

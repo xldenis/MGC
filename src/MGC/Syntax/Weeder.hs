@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 module MGC.Syntax.Weeder where
   import MGC.Syntax
-  import Control.Applicative ((<$>))
+  import Control.Applicative ((<$>), (<*>))
   import Control.Monad (liftM, liftM2, liftM3, liftM4, mapM)
   import Control.Monad.Except
 
@@ -19,7 +19,9 @@ module MGC.Syntax.Weeder where
     | InvalidContinue
     | AssignSizeDifferent
     | BlankValue
-    | InvalidBreak 
+    | InvalidBreak
+    | InvalidArraySize
+    | InvalidLValue
     | MultipleReturnValue deriving Show
 
   pIdent s = case (s == "_") of
@@ -48,17 +50,17 @@ module MGC.Syntax.Weeder where
       else throwError MultipleReturnValue
     weed (Empty) = return Empty
     weed (ExpressionStmt e) = ExpressionStmt <$> (weed e)
-    weed a@(TypeDecl _) = return a
-    weed a@(VarDecl _)  = return a
-    weed (Inc e) = Inc <$> (weed e)
-    weed (Dec e) = Dec <$> (weed e)
+    weed (TypeDecl tps) = TypeDecl <$> mapM weed tps
+    weed (VarDecl vars) = VarDecl  <$> mapM weed vars
+    weed (Inc e) = Inc <$> (lval e)
+    weed (Dec e) = Dec <$> (lval e)
     weed (Fallthrough) = return Fallthrough
     weed (ShortDecl lh rh) = if (length lh) == (length rh)
       then liftM (ShortDecl lh) (weed rh)
       else throwError AssignSizeDifferent
     weed (Assignment op lh rh) = if (length lh) /= (length rh)
       then throwError AssignSizeDifferent
-      else liftM2 (Assignment op) (weed lh) (weed rh)
+      else liftM2 (Assignment op) (join $ mapM lval <$> (weed lh)) (weed rh)
   
   weed' :: Statement -> Either WeederError Statement
   weed' (Continue) = return Continue
@@ -69,13 +71,35 @@ module MGC.Syntax.Weeder where
   weed' (Switch s e b) = liftM3 Switch (weed s) (weed e) (weedSC' b)
   weed' a = weed a
 
-  weedSC' :: SwitchClause -> Either WeederError Statement
-  weedSC' = weed
+  weedSC' :: [SwitchClause] -> Either WeederError [SwitchClause]
+  weedSC' (cls) = do
+      if 1 < (length $ filter (((==) Nothing). fst) cls)
+      then throwError MultipleDefault
+      else mapM (\(c, s)-> (,) <$> (Right c) <*> ((mapM weed') $ s))  cls
+
+  lval :: Expression -> Either WeederError Expression
+  lval t@(Name _)    = return t
+  lval t@(Index _ _) = return t
+  lval t@(Selector _ _) = return t
+  lval _ = throwError InvalidLValue
+
+  instance Weedable TypeSpec where
+    weed (TypeSpec iden tp) = TypeSpec iden <$> (weed tp)
+
+  instance Weedable VarSpec where
+    weed (VarSpec idens exps Nothing) = if (length idens) == (length exps)
+      then liftM2 (VarSpec idens) (weed exps) (return $ Nothing)
+      else throwError AssignSizeDifferent
+    weed (VarSpec idens exps tp) = if (length exps == 0) || (length idens == length exps)
+      then liftM2 (VarSpec idens) (weed exps) (weed tp)
+      else throwError AssignSizeDifferent
+
   instance Weedable SwitchClause where
     weedList cls = do
       if 1 < (length $ filter (((==) Nothing). fst) cls)
       then throwError MultipleDefault
       else mapM weed cls
+    weed (e, s) = (,) <$> weed e <*> weed s
     --weed = throwError MultipleDefault 
 
   blankString n =  if n == "_"
@@ -86,7 +110,7 @@ module MGC.Syntax.Weeder where
     weed (Name n) = Name <$> blankString n
     weed (BinaryOp o l r)    = liftM2 (BinaryOp o) (weed l) (weed r)
     weed (UnaryOp o e)       = liftM  (UnaryOp o) (weed e)
-    weed (Conversion tp e)   = liftM  (Conversion tp) (weed e)
+    weed (Conversion tp e)   = liftM2 Conversion (weed tp) (weed e)
     weed (Selector e i)      = liftM2 Selector (weed e) (blankString i)
     weed (Index l r)         = liftM2 Index (weed l) (weed r)
     weed (SimpleSlice s l r) = liftM3 SimpleSlice (weed s) (weed l) (weed r)
@@ -94,8 +118,16 @@ module MGC.Syntax.Weeder where
     weed (Arguments e a)     = liftM2 Arguments (weed e) (weed a)
     weed e = Right e
 
+  instance Weedable Type where
+    weed (Array size tp) = Array <$> (case size of 
+      Integer _ -> return size
+      _ -> throwError InvalidArraySize
+      ) <*> (weed tp)
+    weed a = return a
+
   instance Weedable a =>  Weedable [a] where weed a = (weedList a)
 
   instance Weedable a => Weedable (Maybe a) where
     weed (Just b) = liftM Just (weed b)
     weed Nothing  = return $ Nothing
+

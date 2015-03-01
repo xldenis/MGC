@@ -19,7 +19,7 @@ module MGC.Parser.Expression  where
 
 
   table = [
-     [Postfix (selector), Postfix (index), Postfix (args), Postfix (slice)]
+     [ Postfix (selector), Postfix (index), Postfix (slice)]
    , (map (\(s,tp) -> prefix s tp) unaryOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) mulOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) addOps)
@@ -33,10 +33,16 @@ module MGC.Parser.Expression  where
   postfix n fun = Postfix (do{op n; return $ UnaryOp fun;})
 
   opLetter :: [Char]
-  opLetter = "+-/%*=!<>|&^"
+  opLetter = "/%*=!<>|&^"
 
   op :: String -> Parser ()
-  op s = try $ string s >> notFollowedBy (oneOf opLetter) >> lineSpace
+  op s = try $ do 
+    o <- string s
+    case o of
+      "+" -> notFollowedBy (oneOf $opLetter ++ "+")
+      "-" -> notFollowedBy (oneOf $opLetter ++ "-")
+      _  -> notFollowedBy (oneOf opLetter)
+    lineSpace
 
   expression :: Parser Expression
   expression = try (buildExpressionParser table primaryExpr <?> "Expression")
@@ -45,7 +51,7 @@ module MGC.Parser.Expression  where
   primaryExpr = (operand) <* lineSpace
 
   operand :: Parser Expression
-  operand = literal <|> name <|> conversion <|> (parens expression)
+  operand = literal <|>  args <|> name <|> conversion <|> (parens expression)
 
   name :: Parser Expression
   name = (Name <$> identifier) <|> (QualName <$> identifier <*> identifier)
@@ -68,12 +74,8 @@ module MGC.Parser.Expression  where
     case a of
       Just e3 -> return $ (\x -> FullSlice x e1 e2 e3)
       Nothing -> return $ (\x -> SimpleSlice x e1 e2)
-    
-  --typeAssertion :: Parser Expression
-  --typeAssertion  = char '.' >> parens typeParser
 
-  args :: Parser (Expression -> Expression)
-  args = (flip Arguments) <$> parens expressionList
-
+  args :: Parser (Expression)
+  args = try $ Arguments <$> (Name <$> reservedFunc) <*> parens expressionList
 
   expressionList = expression `sepEndBy` (lexeme ",")

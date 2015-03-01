@@ -5,7 +5,6 @@ module MGC.Parser.TypeSpec (spec) where
   import MGC.Parser.Type
   import MGC.Syntax
   import Test.Hspec
-  import Control.Applicative ((<|>))
 
   spec :: Spec
   spec = do 

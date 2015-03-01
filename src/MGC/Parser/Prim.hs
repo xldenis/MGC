@@ -9,11 +9,12 @@ module MGC.Parser.Prim where
   import MGC.Syntax
 
   reservedWords = [ 
-    "append", "bool", "break", "case", "chan", "const", "continue", "default",
+    "bool", "break", "case", "chan", "const", "continue", "default",
     "defer", "else", "fallthrough", "float64", "for", "func", "go", "goto",
-    "if", "import", "int", "interface", "map", "package", -- "print", "println",
-    "range", "return", "rune", "select", "string", "struct", "switch", "type", "var" ]
+    "if", "import", "int", "interface", "map", "package",  "range", "return",
+    "rune", "select", "string", "struct", "switch", "type", "var" ] ++ reservedTypes ++ reservedFuncs
 
+  reservedFuncs = ["append", "print", "println"]
   reservedTypes = [ "int", "interface", "float64", "bool", "int", "rune", "map", "chan", "func"]
 
   parens :: Parser a -> Parser a
@@ -42,13 +43,13 @@ module MGC.Parser.Prim where
 
   semi = lexeme ";" >> return ()
 
-  semi' = (lexeme' ";" >> return ()) <|> fullSpace
+  semi' = (try $ lineSpace >> lexeme' ";" >> return ()) <|> (try $ lineSpace >> fullSpace >> return  ()) <?> "Termination"
 
   lexeme :: String -> Parser String
   lexeme s = try $ string s <* lineSpace
 
   lexeme' :: String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
-  lexeme' s = try $ string s <* (fullSpace)
+  lexeme' s = try $ string s <* fullSpace
 
   fullSpace :: Parser ()
   fullSpace = try $ do
@@ -58,7 +59,7 @@ module MGC.Parser.Prim where
   lineSpace :: Parser ()
   lineSpace = try $ do
     many $ lineComment <|> (satisfy (\x -> isSpace x && not (x == '\n' || x == '\r')) >> return ())
-    return ()
+    return () <?> "seperator"
 
   singleComment :: Parser ()
   singleComment = try $ do
@@ -90,7 +91,7 @@ module MGC.Parser.Prim where
     firstChar <- letter <|> char '_'
     lastChars <- (many $ (alphaNum <|> char '_')) <* lineSpace
     let name = [firstChar] ++ lastChars
-    if (elem name reservedWords)
+    if (elem name $ reservedWords++ reservedTypes)
     then fail $ "cannot use reserved word " ++ name ++" as identifier" 
     else return $ name
 
@@ -101,14 +102,21 @@ module MGC.Parser.Prim where
     then fail $ "cannot use reserved word " ++ word ++" as identifier" 
     else return $ word  
 
+  reservedFunc :: Parser Identifier
+  reservedFunc = try $ do
+    word <- (many1 $ (alphaNum)) <* lineSpace
+    if (elem word reservedWords) && not (elem word reservedFuncs  )
+    then fail $ "cannot use reserved word " ++ word ++" as identifier" 
+    else return $ word  
+
   identifierList = identifier `sepEndBy1` (lexeme ",")
 
-  literal = basicLit
+  literal = basicLit <?> "literal value"
 
-  basicLit = intLit <|> stringLit <|> runeLit
+  basicLit = floatLit <|> intLit <|> stringLit <|> runeLit
 
   runeLit :: Parser Expression
-  runeLit = Rune <$> quotes' (byteLit <|> anyChar)
+  runeLit = Rune <$> quotes' (byteLit <|> (noneOf "'"))
 
   byteLit :: Parser Char
   byteLit = try $ do
@@ -117,11 +125,10 @@ module MGC.Parser.Prim where
     return $ (fst . head . readLitChar) ('\\':chars)
 
   stringLit :: Parser Expression
-  stringLit = try $ (quotes (interpretedString) <|> (try $ RawString <$> (ticks (many (noneOf "`"))))) 
-
+  stringLit = try $ (quotes (interpretedString) <|> (try $ RawString <$> (ticks (many (noneOf "`")))))
   interpretedString :: Parser Expression
-  interpretedString = try $ IntString . concat <$> (many $ unicodeEscape <|> escapeSeq <|> (flip (:) [] <$> (noneOf "\n\"")))
-
+  interpretedString = try $ IntString . concat <$> (many $ unicodeEscape <|> escapeSeq <|> (flip (:) [] <$> (noneOf "\n\"\\")))
+  
   unicodeEscape :: Parser String
   unicodeEscape = try $ do
     len <- char '\\' *> (char 'u' <|> char 'U')
@@ -142,7 +149,9 @@ module MGC.Parser.Prim where
     liftM (Integer . fst . head . readOct) (many1 octDigit)
 
   decimalLit :: Parser Expression
-  decimalLit = try $ liftM (Integer . fst . head . readDec) (many1 digit)
+  decimalLit = try $ do
+    digits <- ((:) <$> oneOf "123456789" <*> many digit) <|> (many1 $ char '0')
+    return $ (Integer . fst . head . readDec) digits
 
   hexLit :: Parser Expression
   hexLit = try $ do

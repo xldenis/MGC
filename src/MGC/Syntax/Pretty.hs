@@ -60,6 +60,7 @@ module MGC.Syntax.Pretty where
   EmptyDoc <+> a = a
   (Doc in1 s) <+> (Doc _ t) = Doc in1 (s++" "++t)
   (Doc in1 s) <+> a = (HUnion in1 [Doc 0 $ s++" "]) <> a
+  (VUnion in1 s) <+> (VUnion in2 t) = VUnion in1 (init s ++ [last s <+> head t, VUnion (in2 - in1) $ tail s])
   (VUnion in1 s) <+> b = HUnion in1 $ (VUnion 0 s) : [char ' ', b]
   (HUnion in1 s) <+> (VUnion in2 t) = HUnion in1 $ s ++ [(head t), (VUnion in2 (tail t))]
   (HUnion in1 s) <+> c = HUnion in1 $ s ++ [char ' ', c]
@@ -75,7 +76,7 @@ module MGC.Syntax.Pretty where
   nest n (Doc ind txt) = Doc (ind+n) txt
   nest n (VUnion ind lst) = VUnion (ind+n) lst
   nest n (HUnion ind lst) = HUnion (ind+n) lst
-  nest n EmptyDoc = EmptyDoc
+  nest _ EmptyDoc = EmptyDoc
     
   braces :: Doc -> Doc
   braces d = (char '{') $$ d $$ (char '}')
@@ -88,8 +89,10 @@ module MGC.Syntax.Pretty where
 
   parens :: Doc -> Doc
   parens d = (char '(') <> d <> (char ')')
+
   parens' :: Doc -> Doc
   parens' d = (char '(') $$ d $$ (char ')')
+
   quotes :: Doc -> Doc
   quotes d = (char '"') <> d <> (char '"')
 
@@ -102,8 +105,10 @@ module MGC.Syntax.Pretty where
   bool :: Bool -> Doc
   bool True  = (Doc 0 "true")
   bool False = (Doc 0 "false")
+
   prettyShow :: Doc -> String
   prettyShow = prettyShow' 0
+
   prettyShow' _ (VUnion _ []) = ""
   prettyShow' n (VUnion ind stmts) =  (intercalate "\n" $ map (prettyShow' $ n+ind) stmts)
   prettyShow' n (Doc ind stmt) = (replicate (n + ind) ' ')++ stmt
@@ -150,8 +155,10 @@ module MGC.Syntax.Pretty where
       (case right of
         Empty -> empty
         _ -> text "else" <+> pretty right)
+
     pretty (For cond body) = text "for" <+> (pretty cond) <+> (pretty body)
-    pretty (Switch s e body) = text "switch" <+> (pretty s) <+> (pretty e) <+> (pretty body)
+    pretty (Switch s@(Just _) e body) = text "switch" <+> (pretty s) <> (char ';') <+> (pretty e) <+> (braces $ nest 2 $ pretty body)
+    pretty (Switch _ e body) = text "switch" <+> (pretty e) <+> (braces $ nest 2 $ pretty body)
     pretty Continue = text "continue"
     pretty Break = text "break"
     pretty (Block stmt) = braces $ (nest 2 (pretty stmt))
@@ -171,6 +178,7 @@ module MGC.Syntax.Pretty where
 
   instance Pretty SwitchClause where
     pretty (Nothing, body) = text "default:" $$ (nest 2 $ pretty body) 
+    pretty (Just a,  body) = text "case" <+> pretty a <> (char ':') $$ (nest 2 $ pretty body)
 
   instance Pretty ForCond where
     pretty (Condition exp) = pretty exp
@@ -183,7 +191,6 @@ module MGC.Syntax.Pretty where
     pretty (Struct decls) = text "struct" <> (if length decls == 1
       then braces' $ pretty (head decls)
       else braces $ nest 2 $ pretty decls)
-    --pretty (Pointer tp) = text "*" <> (pretty tp)
     pretty (Function sig) = text "func" <> (pretty sig)
     pretty (Interface fields) = text "interfaces" <+> (braces $ pretty fields)
     pretty (Slice tp) = text "[]" <> (pretty tp)
@@ -201,7 +208,7 @@ module MGC.Syntax.Pretty where
     pretty (AnonField tp t)  = (pretty tp) <+> (pretty t)
 
   instance Pretty MethodSpec where
-    pretty a = empty
+    pretty _ = empty
 
   instance Pretty Expression where
     prettyList exps = foldl (<>) empty $ intersperse (text ", ") $ map pretty exps
@@ -213,7 +220,6 @@ module MGC.Syntax.Pretty where
     pretty (Index exp ind)  = (pretty exp) <> (brackets $ pretty ind)
     pretty (SimpleSlice sliced lower upper) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper))
     pretty (FullSlice sliced lower upper dir) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper) <> (char ':') <> (pretty dir))
-    --pretty TypeAssertion tp -- not done
     pretty (Name ident) = text ident
     pretty (QualName pkg ident) = (text pkg) <> (char '.') <> (text ident)
     pretty (Integer val) = int val

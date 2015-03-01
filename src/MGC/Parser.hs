@@ -5,7 +5,7 @@ module MGC.Parser where
   import MGC.Parser.Type
   import MGC.Parser.Prim
 
-  import Text.Parsec (try, many, sepEndBy, Parsec)
+  import Text.Parsec (try, many)
   import Text.Parsec.String
   import Text.Parsec.Char
   import Text.Parsec.Combinator
@@ -30,7 +30,7 @@ module MGC.Parser where
   topLevelDef = (declaration <|> funcDec) <* fullSpace
 
   declaration :: Parser TopLevelDeclaration
-  declaration = Decl <$> (typeDec <|> varDec)
+  declaration = Decl <$> ((typeDec <* semi') <|> (varDec <* semi'))
 
   funcDec :: Parser TopLevelDeclaration
   funcDec = try $ do
@@ -51,7 +51,7 @@ module MGC.Parser where
   varDec :: Parser Statement
   varDec = try $ do
     lexeme "var"
-    VarDecl <$> ((flip (:) []) <$> varSpec <* semi' <|> (parens' $ (varSpec `sepEndBy` semi')))
+    VarDecl <$> ((flip (:) []) <$> (varSpec) <|> (parens' $ (varSpec `sepBy` semi')))
 
   varSpec = try $ do
     idents <- identifierList
@@ -61,9 +61,9 @@ module MGC.Parser where
     return $ VarSpec idents exprs tp
 
   statement :: Parser Statement
-  statement = varDec <|> typeDec <|> simpleStatement <|> returnStmt <|> ifStmt <|> 
+  statement = ((varDec <|> typeDec <|> simpleStatement <|> returnStmt <|> ifStmt <|> 
     switchStmt <|> forStmt <|> blockStmt <|> breakStmt <|> fallthroughStmt <|>
-    contStmt <|> ((return Empty) <* (char ';' >> fullSpace))
+    contStmt) <* semi') <|> ((return Empty) <* (char ';' >> fullSpace))
 
   returnStmt :: Parser Statement
   returnStmt = do
@@ -71,29 +71,29 @@ module MGC.Parser where
     Return <$> expressionList
 
   breakStmt :: Parser Statement
-  breakStmt = (reserved "break" <* semi') *> return Break
+  breakStmt = (reserved "break") *> return Break
 
   contStmt :: Parser Statement
-  contStmt = (reserved "continue" <* semi') *> return Continue
+  contStmt = (reserved "continue") *> return Continue
   
   fallthroughStmt :: Parser Statement
-  fallthroughStmt = (reserved "fallthrough" <* semi') *> return Fallthrough
+  fallthroughStmt = (reserved "fallthrough") *> return Fallthrough
   
   ifStmt :: Parser Statement
   ifStmt = do
     reserved "if"  
     stmt <- optionMaybe (try $ simpleStatement <* semi)
     expr <- expression
-    left <- Block <$> (braces' $ statement `sepEndBy` (semi'))
+    left <- blockStmt
     right <- (reserved "else" >> (ifStmt <|> blockStmt)) <|> return Empty
     return $ If stmt expr left right
 
   switchStmt :: Parser Statement
   switchStmt = do
     reserved "switch"
-    stmt <- optionMaybe $ try $ simpleStatement <* (semi)
+    stmt <- optionMaybe $ try $ simpleStatement <* semi
     expr <- optionMaybe expression
-    clauses <- braces (many exprCaseClause) 
+    clauses <- braces' (many exprCaseClause) 
     return $ Switch stmt expr clauses
 
   exprCaseClause :: Parser SwitchClause
@@ -121,11 +121,11 @@ module MGC.Parser where
     semi
     cond <- expression
     semi
-    postStmt <- simpleStatement <|> (lookAhead (try $ char ';') >> return Empty)
+    postStmt <- incDec <|> assign <|> opAssign <|> exprStmt
     return $ ForClause initStmt cond postStmt
 
   blockStmt :: Parser Statement
-  blockStmt = Block <$> (braces $ statement `sepEndBy` (semi'))
+  blockStmt = Block <$> (braces' $ many statement)
 
   simpleStatement :: Parser Statement
   simpleStatement = try $ incDec <|> assign <|> opAssign <|> shortDec <|> exprStmt
