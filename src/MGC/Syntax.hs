@@ -25,7 +25,6 @@ module MGC.Syntax where
    | Index Expression Expression
    | SimpleSlice Expression Expression Expression
    | FullSlice Expression Expression Expression Expression
-   -- | TypeAssertion Type
    | Arguments Expression [Expression]
    | Name Identifier
    | QualName Identifier Identifier
@@ -44,8 +43,6 @@ module MGC.Syntax where
     
   data UOp = Pos | Neg | Not | BComp  deriving (Show, Eq)
 
-    -- = Print
-    -- | PrintLn
   data Statement
     = Return [Expression]
     | If (Maybe Statement) Expression Statement Statement
@@ -70,10 +67,8 @@ module MGC.Syntax where
 
   data Type 
     = TypeName Identifier 
-    -- | QualTypeName Identifier Identifier
     | Array Expression Type 
     | Struct [FieldDecl]
-    -- | Pointer Type 
     | Function Signature
     | Interface [MethodSpec] 
     | Slice Type 

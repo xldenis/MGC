@@ -47,7 +47,7 @@ module MGC.Syntax.Weeder where
 
   instance Weedable Statement where 
     weed st (Switch s e bdy) = liftM3 Switch (weed st s) (weed st e) (weed st bdy)
-    weed st (For _ bdy) = weed (st {loop = True}) bdy -- fix
+    weed st (For _ bdy) = weed (st {loop = True}) bdy
     weed st (Continue) = if (loop st)
       then return Continue
       else throwError InvalidContinue
@@ -56,9 +56,9 @@ module MGC.Syntax.Weeder where
       else throwError InvalidBreak
     weed st (If s e l r) = liftM4 If (weed st s) (weed st e) (weed st l) (weed st r)
     weed st (Block bdy) = Block <$> (weed st bdy) 
-    weed st (Return e) = case (funcReturn st, (length e) <= 1 ) of
-      (True, True) ->  Return <$> (weed st e) 
-      (False, False) ->Return <$> (weed st e) 
+    weed st (Return e) = case (funcReturn st, length e) of
+      (True, 1) ->  Return <$> (weed st e) 
+      (False, 0) ->Return <$> (weed st e) 
       (_, _) -> throwError MultipleReturnValue
     weed st (Empty) = return Empty
     weed st (ExpressionStmt e) = ExpressionStmt <$> (weed st e)
@@ -72,29 +72,9 @@ module MGC.Syntax.Weeder where
       else throwError AssignSizeDifferent
     weed st (Assignment op lh rh) = if (length lh) /= (length rh)
       then throwError AssignSizeDifferent
-      else liftM2 (Assignment op) (weed (st {lhs = True}) lh) (weed st rh)
-  
-  --weed' :: Statement -> Either WeederError Statement
-  --weed' (Continue) = return Continue
-  --weed' (Break) = return Break
-  --weed' (If s e l r) = liftM4 If (weed s) (weed e) (weed' l) (weed' r)
-  --weed' (Block bdy) = Block <$> (mapM weed' bdy) 
-  --weed' (For _ bdy) = weed' bdy
-  --weed' (Switch s e b) = liftM3 Switch (weed s) (weed e) (weedSC' b)
-  --weed' a = weed a
-
-  --weedSC' :: [SwitchClause] -> Either WeederError [SwitchClause]
-  --weedSC' (cls) = do
-  --    if 1 < (length $ filter (((==) Nothing). fst) cls)
-  --    then throwError MultipleDefault
-  --    else mapM (\(c, s)-> (,) <$> (Right c) <*> ((mapM weed') $ s))  cls
-
-  --lval :: Expression -> Either WeederError Expression
-  --lval t@(Name _)    = return t
-  --lval t@(Index _ _) = return t
-  --lval t@(Selector _ _) = return t
-  --lval _ = throwError InvalidLValue
-
+      else if op == Eq
+        then liftM2 (Assignment op) (weed (st {lhs = True}) lh) (weed st rh)
+        else liftM2 (Assignment op) (weed st lh) (weed st rh)
   instance Weedable TypeSpec where
     weed st (TypeSpec iden tp) = TypeSpec iden <$> (weed st tp)
 
