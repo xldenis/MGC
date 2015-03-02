@@ -93,7 +93,7 @@ module MGC.Parser where
     stmt <- optionMaybe (try $ (simpleStatement <|> (return Empty)) <* semi)
     expr <- expression
     left <- blockStmt
-    right <- (reserved "else" >> (ifStmt <|> blockStmt)) <|> return Empty
+    right <- (reserved' "else" >> (ifStmt <|> blockStmt)) <|> return Empty
     return $ If stmt expr left right
 
   switchStmt :: Parser Statement

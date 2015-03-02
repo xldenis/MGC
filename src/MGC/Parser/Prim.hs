@@ -86,6 +86,13 @@ module MGC.Parser.Prim where
     then return $ name
     else fail $  name ++"is not a reserved word" 
 
+  reserved' :: String -> Parser String
+  reserved' s = try $ do
+    name <- lexeme'  s
+    if (elem name reservedWords)
+    then return $ name
+    else fail $  name ++"is not a reserved word" 
+
   identifier :: Parser Identifier
   identifier = try $ do
     firstChar <- letter <|> char '_'
