@@ -14,7 +14,7 @@ module MGC.Parser.TypeSpec (spec) where
 
     describe "typeLit" $ do
       it "parses arrays" $ do
-        typeLit `parses` "[1]int" ~> (Array (Integer 1) (TInteger))
+        typeLit `parses` "[1]int" ~> (Array (1) (TInteger))
     describe "typeParser" $ do
       it "parses literals" $ do
         pending
@@ -33,5 +33,5 @@ module MGC.Parser.TypeSpec (spec) where
               F func()
             }
           |]
-          let expected = Struct [NamedField ["x","y"] TInteger (Just $ IntString "test"),NamedField ["u"] (TypeName "float32") Nothing,NamedField ["_"] (TypeName "float32") Nothing,NamedField ["A"] (Slice TInteger) Nothing,NamedField ["F"] (Function (Signature [] [])) Nothing]
+          let expected = Struct [NamedField ["x","y"] TInteger (Just $ "test"),NamedField ["u"] (TypeName "float32") Nothing,NamedField ["_"] (TypeName "float32") Nothing,NamedField ["A"] (Slice TInteger) Nothing,NamedField ["F"] (Function (Signature [] [])) Nothing]
           typeParser `parses` test ~> expected

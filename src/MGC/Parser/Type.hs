@@ -17,7 +17,13 @@ module MGC.Parser.Type  where
   typeLit = builtins <|> arrayType <|> functionType  <|> interfaceType <|> sliceType <|> structType -- <|> pointerType
 
   arrayType :: Parser Type
-  arrayType = try $ Array <$> (brackets expression) <*> typeParser
+  arrayType = try $ do
+    len <- (brackets expression)
+    l <- case len of
+      Integer i -> return i
+      _ -> fail "Invalid Array length"
+    tp <- typeParser
+    return $ Array l tp
 
   sliceType :: Parser Type
   sliceType = try $ string "[]" *> (Slice <$> typeParser)
@@ -33,7 +39,15 @@ module MGC.Parser.Type  where
 
   fieldDecl = namedField <|> anonField
 
-  tag = try $ optionMaybe stringLit
+  tag :: Parser (Maybe String)
+  tag = try $ do
+    tg <- optionMaybe stringLit
+    case tg of
+      Just (IntString s) -> return $ Just s
+      Just (RawString s) -> return $ Just s
+      Nothing -> return $ Nothing
+      _ -> fail "Impossible parse"
+
 
   namedField = try $ do
     p <- (,) <$>  (option [] identifierList) <*> typeParser

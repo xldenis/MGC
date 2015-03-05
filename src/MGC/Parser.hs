@@ -24,7 +24,7 @@ module MGC.Parser where
       Just op' -> return op'
       _ -> fail "Invalid AddOp"
 
-  package :: Parser Package
+  package :: Parser (Package ())
 
   package = do
     fullSpace
@@ -34,13 +34,13 @@ module MGC.Parser where
     content <- many topLevelDef
     return $ Package name content
 
-  topLevelDef :: Parser TopLevelDeclaration
+  topLevelDef :: Parser (TopLevelDeclaration ())
   topLevelDef = (declaration <|> funcDec) <* fullSpace
 
-  declaration :: Parser TopLevelDeclaration
+  declaration :: Parser (TopLevelDeclaration ())
   declaration = Decl <$> ((typeDec <* semi') <|> (varDec <* semi'))
 
-  funcDec :: Parser TopLevelDeclaration
+  funcDec :: Parser (TopLevelDeclaration ())
   funcDec = try $ do
     reserved "func"
     name <- identifier
@@ -48,7 +48,7 @@ module MGC.Parser where
     body <- optionMaybe blockStmt
     return $ FunctionDecl name sig body
     
-  typeDec :: Parser Statement
+  typeDec :: Parser (Statement ())
   typeDec = try $ do
     lexeme "type"
     TypeDecl <$> ( (flip (:) []) <$> typeSpec <|> (parens' $ typeSpec `sepEndBy` semi'))
@@ -56,7 +56,7 @@ module MGC.Parser where
   typeSpec :: Parser TypeSpec
   typeSpec =  TypeSpec <$> identifier <*> typeParser
 
-  varDec :: Parser Statement
+  varDec :: Parser (Statement ())
   varDec = try $ do
     lexeme "var"
     VarDecl <$> ((flip (:) []) <$> (varSpec) <|> (parens' $ (varSpec `sepEndBy` semi')))
@@ -68,26 +68,26 @@ module MGC.Parser where
     exprs <- (try $ lexeme "=" *> expressionList) <|> (return [])
     return $ VarSpec idents exprs tp
 
-  statement :: Parser Statement
+  statement :: Parser (Statement ())
   statement = ((varDec <|> typeDec <|> simpleStatement <|> returnStmt <|> ifStmt <|> 
     switchStmt <|> forStmt <|> blockStmt <|> breakStmt <|> fallthroughStmt <|>
     contStmt) <* semi') <|> ((return Empty) <* (char ';' >> fullSpace))
 
-  returnStmt :: Parser Statement
+  returnStmt :: Parser (Statement ())
   returnStmt = do
     reserved "return"
     Return <$> expressionList
 
-  breakStmt :: Parser Statement
+  breakStmt :: Parser (Statement ())
   breakStmt = (reserved "break") *> return Break
 
-  contStmt :: Parser Statement
+  contStmt :: Parser (Statement ())
   contStmt = (reserved "continue") *> return Continue
   
-  fallthroughStmt :: Parser Statement
+  fallthroughStmt :: Parser (Statement ())
   fallthroughStmt = (reserved "fallthrough") *> return Fallthrough
   
-  ifStmt :: Parser Statement
+  ifStmt :: Parser (Statement ())
   ifStmt = do
     reserved "if"  
     stmt <- optionMaybe (try $ (simpleStatement <|> (return Empty)) <* semi)
@@ -96,7 +96,7 @@ module MGC.Parser where
     right <- (reserved' "else" >> (ifStmt <|> blockStmt)) <|> return Empty
     return $ If stmt expr left right
 
-  switchStmt :: Parser Statement
+  switchStmt :: Parser (Statement ())
   switchStmt = do
     reserved "switch"
     stmt <- optionMaybe $ try $ simpleStatement <* semi
@@ -104,14 +104,14 @@ module MGC.Parser where
     clauses <- braces' (many exprCaseClause) 
     return $ Switch stmt expr clauses
 
-  exprCaseClause :: Parser SwitchClause
+  exprCaseClause :: Parser (SwitchClause ())
   exprCaseClause = try $ do
     caseType <- (lexeme "case" >> Just <$> expressionList) <|> (lexeme "default" >> return Nothing)
     lexeme' ":"
     stmts <- statement `sepEndBy` semi'
     return $ (caseType, stmts)
 
-  forStmt :: Parser Statement
+  forStmt :: Parser (Statement ())
   forStmt = do
     reserved "for"
     cond <- (optionMaybe $ forClause 
@@ -122,7 +122,7 @@ module MGC.Parser where
     body <- blockStmt
     return $ For cond body
 
-  forClause :: Parser ForCond
+  forClause :: Parser (ForCond ())
   forClause = try $ do
     initStmt <- simpleStatement <|> (lineSpace >> lookAhead (try $ char ';') >> return Empty)
     semi
@@ -131,35 +131,35 @@ module MGC.Parser where
     postStmt <- incDec <|> assign <|> opAssign <|> exprStmt <|> (lineSpace >> return Empty)
     return $ ForClause initStmt cond postStmt
 
-  blockStmt :: Parser Statement
+  blockStmt :: Parser (Statement ())
   blockStmt = Block <$> (braces' $ many statement)
 
-  simpleStatement :: Parser Statement
+  simpleStatement :: Parser (Statement ())
   simpleStatement = try $ incDec <|> assign <|> shortDec <|> opAssign <|>  exprStmt
   
-  exprStmt :: Parser Statement
+  exprStmt :: Parser (Statement ())
   exprStmt = try $ ExpressionStmt <$> expression
 
-  incDec :: Parser Statement
+  incDec :: Parser (Statement ())
   incDec = try $ do
     e <- expression
     (lexeme "++" *> (return $ Inc e)) <|> (lexeme "--" *> (return $ Dec e))
 
-  assign :: Parser Statement
+  assign :: Parser (Statement ())
   assign = try $ do
     lhs <- expressionList
     lexeme "=" -- wrong
     rhs <- expressionList
     return $ Assignment Eq lhs rhs
 
-  opAssign :: Parser Statement
+  opAssign :: Parser (Statement ())
   opAssign = try $ do
     lhs <- expression
     op <- (addOpParser <|> mulOpParser) <* lexeme "=" -- wrong
     rhs <- expression
     return $ Assignment op [lhs] [rhs]
 
-  shortDec :: Parser Statement
+  shortDec :: Parser (Statement ())
   shortDec = try $ do
     idents <- identifierList
     lexeme ":="

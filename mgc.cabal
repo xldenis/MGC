@@ -25,11 +25,13 @@ library
     MGC.Syntax
     MGC.Syntax.Pretty
     MGC.Syntax.Weeder
+    MGC.Type
     MGC
 
   build-depends:       base >=4.7 && <4.8,
                        parsec >= 3.0,
                        pretty >= 1,
+                       containers,
                        mtl
 
   hs-source-dirs:      src
@@ -47,6 +49,7 @@ executable mgc
                        parsec >= 3.0,
                        pretty >= 1,
                        filepath,
+                       containers, 
                        cmdargs,
                        mtl
   hs-source-dirs:      src

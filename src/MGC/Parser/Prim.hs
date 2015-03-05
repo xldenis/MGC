@@ -21,7 +21,7 @@ module MGC.Parser.Prim where
   parens = between (lexeme "(") (lexeme ")")
   
   parens' :: Parser a -> Parser a
-  parens' = between (lexeme' "(") (lexeme' ")")
+  parens' = between (lexeme' "(") (lexeme ")")
 
   brackets :: Parser a -> Parser a
   brackets = between (char '[') (char ']')
@@ -43,12 +43,13 @@ module MGC.Parser.Prim where
 
   semi = lexeme ";" >> return ()
 
-  semi' = (try $ lineSpace >> lexeme' ";" >> return ()) <|> (try $ lineSpace >> fullSpace >> return  ()) <?> "Termination"
+  semi' = (try $ lineSpace >> lexeme' ";" >> return ()) <|> 
+    (try $ lineSpace >> ((char '\n' >> return  ()) <|>  singleComment <|> fullComment) >> fullSpace) <?> "Termination"
 
   lexeme :: String -> Parser String
   lexeme s = try $ string s <* lineSpace
 
-  lexeme' :: String -> Parser String -- currently the same as lexeme. Needs to change so that it consumes \n\r
+  lexeme' :: String -> Parser String 
   lexeme' s = try $ string s <* fullSpace
 
   fullSpace :: Parser ()
@@ -122,19 +123,20 @@ module MGC.Parser.Prim where
 
   basicLit = floatLit <|> intLit <|> stringLit <|> runeLit
 
-  runeLit :: Parser Expression
-  runeLit = Rune <$> quotes' (byteLit <|> escapeSeq <|> (flip (:) [] <$> noneOf "'"))
+  runeLit :: Parser (Expression ()  ) -- consider switching back to readLitChar
+  runeLit = Rune <$> quotes' (byteLit <|> (flip (:) [] <$> noneOf "'\n\\") <|> escapeSeq )
 
   byteLit :: Parser String
   byteLit = try $ do
     char '\\'
-    chars <-  (((:) <$> char 'x' <*> count 2 hexDigit)) <|>(count 3 octDigit)
+    chars <-  (((:) <$> char 'x' <*> count 2 hexDigit)) <|> (count 3 octDigit)
     return $  ((:) '\\' chars)
 
-  stringLit :: Parser Expression
+  stringLit :: Parser (Expression ( ))
   stringLit = try $ (quotes (interpretedString) <|> (try $ RawString <$> (ticks (many (noneOf "`")))))
-  interpretedString :: Parser Expression
-  interpretedString = try $ IntString . concat <$> (many $ unicodeEscape <|> escapeSeq <|> (flip (:) [] <$> (noneOf "\n\"\\")))
+
+  interpretedString :: Parser (Expression ( ))
+  interpretedString = try $ IntString . concat <$> (many $ unicodeEscape <|> escapeSeq <|> (string "\\\"") <|> (flip (:) [] <$> (noneOf "\n\"\\")))
   
   unicodeEscape :: Parser String
   unicodeEscape = try $ do
@@ -145,31 +147,31 @@ module MGC.Parser.Prim where
       _ -> fail "invalid unicode escape"
 
   escapeSeq :: Parser String
-  escapeSeq = try $ (char '\\') *> liftM ((:) '\\' . (flip (:) [])) (oneOf "abfnrtv\\'\"")
+  escapeSeq = try $ (char '\\') *> liftM ((:) '\\' . (flip (:) [])) (oneOf "abfnrtv\\'")
 
-  intLit ::  Parser Expression
+  intLit ::  Parser (Expression ())
   intLit = (hexLit <|> octLit <|> decimalLit) <* lineSpace
 
-  octLit ::  Parser Expression
+  octLit ::  Parser (Expression ())
   octLit = try $ do
     char '0'
     liftM (Integer . fst . head . readOct) (many1 octDigit)
 
-  decimalLit :: Parser Expression
+  decimalLit :: Parser (Expression ())
   decimalLit = try $ do
     digits <- ((:) <$> oneOf "123456789" <*> many digit) <|> (many1 $ char '0')
     return $ (Integer . fst . head . readDec) digits
 
-  hexLit :: Parser Expression
+  hexLit :: Parser (Expression ())
   hexLit = try $ do
     char '0'
     oneOf "xX"
     liftM (Integer . fst . head . readHex) (many1 hexDigit)
 
-  floatLit :: Parser Expression
+  floatLit :: Parser (Expression ())
   floatLit = floatLitA <|> floatLitB <|> floatLitC
 
-  floatLitA :: Parser Expression
+  floatLitA :: Parser (Expression ())
   floatLitA = try $ do
     int <- many digit
     char '.'
@@ -179,19 +181,19 @@ module MGC.Parser.Prim where
       Just e -> return $ (Float . fst.head.readFloat) (int ++ "." ++ dec ++ e) 
       _ -> return $ (Float . fst.head.readFloat) (int ++ "." ++ dec)
 
-  floatLitB :: Parser Expression
+  floatLitB :: Parser (Expression ())
   floatLitB = try $  do
     int <- many digit
     exp <- (:) <$> (oneOf "eE") <*> ((:) <$> (oneOf "+-") <*> (many digit))
     return $ (Float .fst.head.readFloat) (int ++ exp)
 
-  floatLitC :: Parser Expression
+  floatLitC :: Parser (Expression ())
   floatLitC = try $ do
     char '.'
     dec <- many1 digit
     exp <- (try $ (:) <$> (oneOf "eE") <*> ((:) <$> (oneOf "+-") <*> (many digit))) <|> (return "")
     return $ (Float .fst.head.readFloat) ("0." ++ dec ++ exp)
 
-  boolLit :: Parser Expression 
+  boolLit :: Parser (Expression ())
   boolLit  = try $ 
     (string "true" >> (return $ Bool True)) <|> (string "false" >> (return $ Bool False))

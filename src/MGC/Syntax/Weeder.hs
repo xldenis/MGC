@@ -25,6 +25,7 @@ module MGC.Syntax.Weeder where
     | InvalidBreak
     | InvalidArraySize
     | InvalidLValue
+    | InvlaidFallthrough
     | MultipleReturnValue deriving Show
 
   data WeederState = State{lhs :: Bool, func :: Bool, funcReturn :: Bool, loop :: Bool }
@@ -33,10 +34,10 @@ module MGC.Syntax.Weeder where
     True -> (throwError InvalidPackageName)
     _ -> return s
 
-  instance Weedable Package where
+  instance Eq a => Weedable (Package a) where
     weed st (Package iden tlds) = liftM2 Package (pIdent iden) (weed st tlds)
 
-  instance Weedable TopLevelDeclaration where
+  instance Eq a => Weedable (TopLevelDeclaration a) where
     weed _  (FunctionDecl _ _ Nothing) = throwError EmptyFuncBody
     weed st (FunctionDecl iden sig bdy) = liftM (FunctionDecl iden sig) (weed (st {func = True, funcReturn= ret sig}) bdy)
     weed st (Decl a@(TypeDecl _)) = Decl <$> (weed st a)
@@ -45,7 +46,7 @@ module MGC.Syntax.Weeder where
 
   ret (Signature _ retParams) = (length retParams) >= 1
 
-  instance Weedable Statement where 
+  instance Eq a => Weedable (Statement a) where 
     weed st (Switch s e bdy) = liftM3 Switch (weed st s) (weed st e) (weed st bdy)
     weed st (For _ bdy) = weed (st {loop = True}) bdy
     weed st (Continue) = if (loop st)
@@ -78,7 +79,7 @@ module MGC.Syntax.Weeder where
   instance Weedable TypeSpec where
     weed st (TypeSpec iden tp) = TypeSpec iden <$> (weed st tp)
 
-  instance Weedable VarSpec where
+  instance Weedable (VarSpec a) where
     weed st (VarSpec idens exps Nothing) = if (length idens) == (length exps)
       then liftM2 (VarSpec idens) (weed st exps) (return $ Nothing)
       else throwError AssignSizeDifferent
@@ -86,11 +87,13 @@ module MGC.Syntax.Weeder where
       then liftM2 (VarSpec idens) (weed st exps) (weed st tp)
       else throwError AssignSizeDifferent
 
-  instance Weedable SwitchClause where
+  instance Eq a => Weedable (SwitchClause a) where
     weedList st cls = do
-      if 1 < (length $ filter (((==) Nothing). fst) cls)
+      if (length $ filter (((==) Nothing) . fst) cls) > 1
       then throwError MultipleDefault
-      else mapM (weed st) cls
+      else if (fallthrough . snd $ last cls)
+        then throwError InvlaidFallthrough      
+        else mapM (weed st) cls
     weed st (e, s) = (,) <$> (weed st e) <*> (weed st s)
     --weed = throwError MultipleDefault 
 
@@ -98,25 +101,25 @@ module MGC.Syntax.Weeder where
     then throwError BlankValue
     else return n
 
-  instance Weedable Expression where
-    weed State{lhs = True} (Name n) = return (Name n)
-    weed st (Selector e i)      = liftM2 Selector (weed (st {lhs = False}) e) (blankString i)
-    weed st (Index l r)         = liftM2 Index (weed (st {lhs = False}) l) (weed (st {lhs = False}) r)
+  fallthrough :: Eq a => [Statement a] -> Bool
+  fallthrough = any ((==) Fallthrough)
+
+  instance Weedable (Expression a) where
+    weed State{lhs = True} (Name a n) = return (Name a n)
+    weed st (Selector a e i)      = liftM2 (Selector a) (weed (st {lhs = False}) e) (blankString i)
+    weed st (Index a l r)         = liftM2 (Index a) (weed (st {lhs = False}) l) (weed (st {lhs = False}) r)
     weed State{lhs = True} _    = throwError InvalidLValue
-    weed st (Name n)            = Name <$> blankString n
-    weed st (BinaryOp o l r)    = liftM2 (BinaryOp o) (weed st l) (weed st r)
-    weed st (UnaryOp o e)       = liftM  (UnaryOp o) (weed st e)
-    weed st (Conversion tp e)   = liftM2 Conversion (weed st tp) (weed st e)
-    weed st (SimpleSlice s l r) = liftM3 SimpleSlice (weed st s) (weed st l) (weed st r)
-    weed st (FullSlice s l d r) = liftM4 FullSlice (weed st s) (weed st l) (weed st d) (weed st r)
-    weed st (Arguments e a)     = liftM2 Arguments (weed st e) (weed st a)
+    weed st (Name a n)            = (Name a) <$> blankString n
+    weed st (BinaryOp a o l r)    = liftM2 (BinaryOp a o) (weed st l) (weed st r)
+    weed st (UnaryOp a o e)       = liftM  (UnaryOp a o) (weed st e)
+    weed st (Conversion tp e)     = liftM2 (Conversion) (weed st tp) (weed st e)
+    weed st (SimpleSlice a s l r) = liftM3 (SimpleSlice a) (weed st s) (weed st l) (weed st r)
+    weed st (FullSlice a s l d r) = liftM4 (FullSlice a) (weed st s) (weed st l) (weed st d) (weed st r)
+    weed st (Arguments a e arg)     = liftM2 (Arguments a) (weed st e) (weed st arg)
     weed _  e = Right e
 
   instance Weedable Type where
-    weed st (Array size tp) = Array <$> (case size of 
-      Integer _ -> return size
-      _ -> throwError InvalidArraySize
-      ) <*> (weed st tp)
+    weed st (Array size tp) = Array size <$> (weed st tp)
     weed _ a = return a
 
   instance Weedable a =>  Weedable [a] where weed st a = (weedList st a)

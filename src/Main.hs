@@ -5,6 +5,7 @@ import System.FilePath.Posix
 import System.Console.CmdArgs
 
 import MGC.Syntax.Pretty
+import MGC.Type
 import MGC.Syntax.Weeder (runWeeder)
 
 import Control.Applicative ((<$>), (<*))
@@ -30,7 +31,7 @@ compile fname args = do
       Left err -> putStrLn $ show err
       Right ast -> do
         case (astPrint args) of
-          True -> putStrLn $ show $ pretty ast
+          True -> putStrLn $ show $ ast
           _ -> return ()
         putStrLn $ prettyShow $ pretty ast
         writeFile (replaceExtension (fname) "pretty.go") $ prettyShow $ pretty ast
