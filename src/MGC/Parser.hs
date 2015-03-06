@@ -106,10 +106,10 @@ module MGC.Parser where
 
   exprCaseClause :: Parser (SwitchClause ())
   exprCaseClause = try $ do
-    caseType <- (lexeme "case" >> Just <$> expressionList) <|> (lexeme "default" >> return Nothing)
+    caseType <- (lexeme "case" >> Case <$> expressionList) <|> (lexeme "default" >> return Default)
     lexeme' ":"
     stmts <- statement `sepEndBy` semi'
-    return $ (caseType, stmts)
+    return $ caseType stmts
 
   forStmt :: Parser (Statement ())
   forStmt = do

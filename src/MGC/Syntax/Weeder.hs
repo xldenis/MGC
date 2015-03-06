@@ -89,13 +89,20 @@ module MGC.Syntax.Weeder where
 
   instance Eq a => Weedable (SwitchClause a) where
     weedList st cls = do
-      if (length $ filter (((==) Nothing) . fst) cls) > 1
+      if (length $ filter (isDefault) cls) > 1
       then throwError MultipleDefault
-      else if (fallthrough . snd $ last cls)
+      else if (fallthrough . stmts $ last cls)
         then throwError InvlaidFallthrough      
         else mapM (weed st) cls
-    weed st (e, s) = (,) <$> (weed st e) <*> (weed st s)
+    weed st (Case e s) = Case <$> (weed st e) <*> (weed st s)
+    weed st (Default s) = Default <$> (weed st s)
     --weed = throwError MultipleDefault 
+
+  isDefault (Default _ ) = True
+  isDefault _ = False
+
+  stmts (Default s) = s
+  stmts (Case _ s)  = s
 
   blankString n =  if n == "_"
     then throwError BlankValue

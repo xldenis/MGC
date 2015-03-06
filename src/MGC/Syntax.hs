@@ -41,30 +41,48 @@ module MGC.Syntax where
     | Plus | Minus | BitOr | BitXor
     | Mult | Div | Mod | LShift | RShift | BitAnd | BitClear  deriving (Show, Eq)
     
+  isMulOp :: BinOp -> Bool
+  isMulOp Mult      = True
+  isMulOp Div       = True
+  isMulOp Mod       = True
+  isMulOp LShift    = True
+  isMulOp RShift    = True
+  isMulOp BitAnd    = True
+  isMulOp BitClear  = True
+  isMulOp _         = False
+
+  isAddOp :: BinOp -> Bool
+  isAddOp Plus    = True
+  isAddOp Minus   = True
+  isAddOp BitOr   = True
+  isAddOp BitXor  = True
+  isAddOp _       = False
+
   data UOp = Pos | Neg | Not | BComp  deriving (Show, Eq)
 
   data Statement a
     = Return [Expression a]
-    | If (Maybe (Statement a)) (Expression a) (Statement a) (Statement a)
-    | Switch (Maybe (Statement a)) (Maybe (Expression a)) [SwitchClause a]
-    | For (Maybe (ForCond a)) (Statement a)
-    | Continue
-    | Break
-    | Fallthrough
+    | Assignment BinOp [Expression a] [Expression a]
     | Block [Statement a]
+    | Break
+    | Continue
+    | Dec (Expression a)
     | Empty
     | ExpressionStmt (Expression a)
+    | Fallthrough
+    | For (Maybe (ForCond a)) (Statement a)
+    | If (Maybe (Statement a)) (Expression a) (Statement a) (Statement a)
     | Inc (Expression a)
-    | Dec (Expression a)
+    | ShortDecl [Identifier] [Expression a]
+    | Switch (Maybe (Statement a)) (Maybe (Expression a)) [SwitchClause a]
     | TypeDecl [TypeSpec]
-    | VarDecl [VarSpec a] 
-    | Assignment BinOp [Expression a] [Expression a]
-    | ShortDecl [Identifier] [Expression a]  deriving (Show, Eq)
+    | VarDecl [VarSpec a] deriving (Show, Eq)
 
   data ForCond a = Condition (Expression a) | ForClause (Statement a) (Maybe (Expression a)) (Statement a)  deriving (Show, Eq)
 
-  type SwitchClause a = (Maybe [Expression a], [Statement a])
-
+  data SwitchClause a
+    = Default [Statement a]
+    | Case [Expression a] [Statement a] deriving (Show, Eq)
   data Type
     = TypeName Identifier 
     | Array Int Type 

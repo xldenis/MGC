@@ -17,7 +17,6 @@ module MGC.Parser.Expression  where
   mulOps = [("*", Mult),("/", Div), ("%",Mod),("<<",LShift), (">>", RShift),("&", BitAnd),("&^", BitClear)]
   unaryOps = [("+", Pos), ("-",Neg), ("!", Not), ("^", BComp) ]
 
-
   table = [
      (map (\(s,tp) -> prefix s tp) unaryOps)
    , (map (\(s,tp) -> binary s tp AssocLeft) mulOps)

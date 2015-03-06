@@ -178,8 +178,8 @@ module MGC.Syntax.Pretty where
       else parens' $ nest 2 $ pretty vars)
 
   instance Pretty (SwitchClause a) where
-    pretty (Nothing, body) = text "default:" $$ (nest 2 $ pretty body) 
-    pretty (Just a,  body) = text "case" <+> pretty a <> (char ':') $$ (nest 2 $ pretty body)
+    pretty (Default body) = text "default:" $$ (nest 2 $ pretty body) 
+    pretty (Case e  body) = text "case" <+> pretty e <> (char ':') $$ (nest 2 $ pretty body)
 
   instance Pretty (ForCond a) where
     pretty (Condition exp) = pretty exp
