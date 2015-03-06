@@ -122,11 +122,7 @@ module MGC.Syntax.Pretty where
     prettyList decs = foldl (<>) empty $ intersperse (text "\n\n") $ map pretty decs
 
     pretty (FunctionDecl ident sig body) = text "func" <+> 
-      text ident <> 
-      (pretty sig) <+> 
-      case body of 
-        Nothing -> empty
-        Just s -> (pretty s)
+      text ident <> (pretty sig) <+> (pretty body)
     pretty (Decl s) = pretty s
 
   instance Pretty TypeSpec where

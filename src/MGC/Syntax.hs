@@ -6,7 +6,7 @@ module MGC.Syntax where
   data Package a = Package Identifier [TopLevelDeclaration a] deriving (Show, Eq)
 
   data TopLevelDeclaration a
-    = FunctionDecl Identifier Signature (Maybe (Statement a))
+    = FunctionDecl Identifier Signature (Statement a)
     | Decl (Statement a) deriving (Show, Eq)
 
   data Signature = Signature [Parameter]  [Parameter] deriving (Show, Eq)
@@ -95,6 +95,7 @@ module MGC.Syntax where
     | TFloat
     | TString
     | TRune
+    | TNil
     | TBool deriving (Show, Eq)
 
 

@@ -45,7 +45,7 @@ module MGC.Parser where
     reserved "func"
     name <- identifier
     sig <- signature
-    body <- optionMaybe blockStmt
+    body <- option Empty blockStmt
     return $ FunctionDecl name sig body
     
   typeDec :: Parser (Statement ())

@@ -38,7 +38,7 @@ module MGC.Syntax.Weeder where
     weed st (Package iden tlds) = liftM2 Package (pIdent iden) (weed st tlds)
 
   instance Eq a => Weedable (TopLevelDeclaration a) where
-    weed _  (FunctionDecl _ _ Nothing) = throwError EmptyFuncBody
+    weed _  (FunctionDecl _ _ Empty) = throwError EmptyFuncBody
     weed st (FunctionDecl iden sig bdy) = liftM (FunctionDecl iden sig) (weed (st {func = True, funcReturn= ret sig}) bdy)
     weed st (Decl a@(TypeDecl _)) = Decl <$> (weed st a)
     weed st (Decl a@(VarDecl _ )) = Decl <$> (weed st a)
