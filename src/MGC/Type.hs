@@ -14,19 +14,21 @@ module MGC.Type where
 
   data TypeError 
     = TypeError
-    | NoNewVars
-    | NotInScope String
-    | MissingField Type Identifier
-    | InvalidIndex Type Type
+    | ImpossibleError String
+    | InvalidCast Type Type
+    | InvalidCondition (Expression Type)
     | InvalidFuncCall
     | InvalidIncDec (Expression Type) Type
-    | ImpossibleError String
+    | InvalidIndex Type Type
     | InvalidOpType BinOp (Expression Type) (Expression Type)
-    | InvalidUOp UOp (Expression Type)
     | InvalidReturn
+    | InvalidUOp UOp (Expression Type)
     | InvalidVarDec Type [Expression Type] 
-    | RedeclaredVar
-    | Mismatch Type Type deriving Show
+    | Mismatch Type Type 
+    | MissingField Type Identifier
+    | NoNewVars
+    | NotInScope String
+    | RedeclaredVar deriving Show
 
   type Check = ExceptT TypeError (State (String, Type, Env))
   type Ann = Type
@@ -47,7 +49,7 @@ module MGC.Type where
       pushScope
       mapM (\(Parameter idens tp) -> mapM (\nm -> modify (addType nm tp)) idens) $ (\(Signature s _) -> s) sig
       b <- case body of
-        Block s -> Block <$> (mapM check s)
+        Block s -> Block <$> (checkList s)
         Empty -> return Empty
         _ -> throwError $ ImpossibleError "Invalid function body"
       popScope
@@ -59,24 +61,34 @@ module MGC.Type where
       mapM (\(TypeSpec n tp) -> modify $ addType n tp) tps
       return $ TypeDecl tps
     check (VarDecl vars) = do
-      tps <- mapM check vars
+      tps <- checkList vars
       return $ VarDecl tps
     check (Return exps) = do
       (_, tp, _) <- get
       e <- checkList exps
       case tp of
-        ReturnType t -> when (t /= (map typeOf e)) $ throwError $ InvalidReturn
+        ReturnType t -> when (t /= (map typeOf e)) $ throwError $ InvalidReturn 
         _ -> throwError $ ImpossibleError "got non return type as function return"
       return $ Return e
     check (If (Just stmt) exp l r) = do -- check type
       pushScope
       s <- check stmt
       e <- check exp
+      tp <- rawType $ typeOf e
+      case tp of
+        TBool -> return ()
+        _ -> throwError $ InvalidCondition e
       lh <- check l
       rh <- check r
       popScope
       return $ If (Just s) e lh rh
-    check (If Nothing exp l r) = If Nothing <$> (check exp) <*> (check l) <*> (check r) -- check exp type
+    check (If Nothing exp l r) = do
+      e <- (check exp)-- check exp type
+      tp <- rawType $ typeOf e
+      case tp of
+        TBool -> return ()
+        _ -> throwError $ InvalidCondition e
+      If Nothing e <$> (check l) <*> (check r)
     check (For (Just cond) body) = do -- check type
       pushScope
       c <- check cond
@@ -88,12 +100,12 @@ module MGC.Type where
       pushScope
       s <- check stmt
       e <- check exp
-      cls' <- mapM check cls
+      cls' <- checkList cls
       popScope
       return $ Switch (Just s) (Just e) cls'
     check (Block stmts) = do
       pushScope
-      s <- mapM check stmts
+      s <- checkList stmts
       popScope
       return $ Block s
     check (ExpressionStmt e) = ExpressionStmt <$> (check e)
@@ -111,9 +123,14 @@ module MGC.Type where
         TString -> return $ Inc e
         TFloat -> return $ Inc e
         t -> throwError $ InvalidIncDec e t
-    check (Assignment op lh rh) = do
-      lhs <- mapM check lh
-      rhs <- mapM check rh
+    check (Assignment Eq lh rh) = do
+      lhs <- checkList lh
+      rhs <- checkList rh
+      mapM (\(l, r) -> when ((typeOf l) /= (typeOf r)) $ throwError (Mismatch (typeOf l) (typeOf r))) $ zip lhs rhs
+      return $ Assignment Eq  lhs rhs
+    check (Assignment op lh rh) = do --accept += string
+      lhs <- checkList lh
+      rhs <- checkList rh
       mapM (\(l, r) -> when ((typeOf l) /= (typeOf r)) $ throwError (Mismatch (typeOf l) (typeOf r))) $ zip lhs rhs
       if isNumOp op
       then when (not $ isNum $ typeOf (head lhs)) $ throwError (InvalidOpType op (head lhs) (head rhs))
@@ -122,7 +139,7 @@ module MGC.Type where
     check (ShortDecl idents exps) = do
       decls <- mapM decl idents
       when (all (==True) decls) (throwError NoNewVars)
-      e <- mapM check exps
+      e <- checkList exps
       mapM (\(d, id, e) -> case d of 
         True -> do
           v <- checkVar id
@@ -143,18 +160,19 @@ module MGC.Type where
   
   instance Checkable VarSpec where
     check (VarSpec idens exps Nothing) = do -- dont ignore tp check double declarations
-      tps <- mapM check exps
+      tps <- checkList exps
       mapM (\(i, t) -> modify (addType i (typeOf t)) ) $ zip idens tps
       return $ VarSpec idens tps Nothing
     check (VarSpec idens exps (Just t)) = do
-      tps <- mapM check exps
-      when (any (/=t) (map typeOf tps)) $ throwError $ InvalidVarDec t tps
+      tps <- checkList exps
+      trueT <- rawType t
+      when (not $all (\x -> (isPrim x && typeOf x == trueT) || (typeOf x == t)) (tps)) $ throwError $ InvalidVarDec t tps
       mapM (\i -> modify (addType i t) ) idens
       return $ VarSpec idens tps (Just t)
 
 
   instance Checkable (SwitchClause) where
-    check (Default stmts) = Default <$> (mapM check stmts)
+    check (Default stmts) = Default <$> (checkList stmts)
     check (Case es stmts) = Case <$> (checkList es) <*> (checkList stmts)
 
   instance Checkable Expression where
@@ -164,12 +182,14 @@ module MGC.Type where
 
       let lhtp = typeOf rh
           rhtp = typeOf lh
-        in case op of
-        a | isCmpOp a -> when ((lhtp /= rhtp)) $ throwError (InvalidOpType a lh rh) -- check that non empty fields are eq
-        a | isOrdOp a -> when ((lhtp /= rhtp) || not (isOrd lhtp)) $ throwError (InvalidOpType a lh rh)
-        a | isNumOp a -> when ((lhtp /= rhtp) || not (isNum lhtp)) $ throwError (InvalidOpType a lh rh)
-        a | isIntOp a -> when ((lhtp /= rhtp) || not (isInt lhtp)) $ throwError (InvalidOpType a lh rh)
-        a             -> when ((lhtp /= rhtp) || not (TBool==lhtp)) $ throwError (InvalidOpType a lh rh)
+      rhraw <- rawType lhtp
+      lhraw <- rawType lhtp
+      case op of
+        a | isCmpOp a -> when ((lhtp /= rhtp)) $ throwError (InvalidOpType a lh rh) -- check that non empty fields are eq, check assignabliity
+        a | isOrdOp a -> when ((lhtp /= rhtp) || not (isOrd lhraw)) $ throwError (InvalidOpType a lh rh)
+        a | isNumOp a -> when ((lhtp /= rhtp) || not (isNum lhraw)) $ throwError (InvalidOpType a lh rh)
+        a | isIntOp a -> when ((lhtp /= rhtp) || not (isInt lhraw)) $ throwError (InvalidOpType a lh rh)
+        a             -> when ((lhtp /= rhtp) || not (TBool==lhraw)) $ throwError (InvalidOpType a lh rh)
       return $ BinaryOp (typeOf rh) op lh rh
 
     check (UnaryOp () op r) = do -- check op type
@@ -180,9 +200,13 @@ module MGC.Type where
         Not   -> when (not$ (==TBool) (typeOf rh)) $ throwError (InvalidUOp op rh)
         BComp -> when (not$ isInt (typeOf rh))     $ throwError (InvalidUOp op rh)
       return $ UnaryOp (typeOf rh) op rh
-    --check (Conversion tp r) = do
-    --  rh <- check r
-    --  return $ Conversion tp rh
+    check (Conversion tp r) = do
+      rh <- check r
+      tTp <- rawType $ tp
+      trh <- rawType $ typeOf rh
+      let prims = [TInteger, TFloat, TBool, TRune]
+      when (not (elem tTp prims || elem trh prims)) $ throwError $ InvalidCast tp (typeOf rh)
+      return $ Conversion tp rh
     check (Selector () l i) = do
       lh <- check l
       case field (typeOf lh) i of
@@ -203,7 +227,7 @@ module MGC.Type where
       (farg, tp) <- case (typeOf lh) of
         Function (Signature farg out) -> return (farg, out)
         _ -> throwError $ InvalidFuncCall
-      rh <- mapM check args
+      rh <- checkList args
       if (map typeOf rh) /= (funcTypes farg)
       then throwError $ InvalidFuncCall
       else return $ Arguments (ReturnType $ funcTypes tp) lh rh
@@ -229,8 +253,25 @@ module MGC.Type where
     x:xs -> (l, tp, (M.insert i t x):xs)
     [] -> (l, tp, [])
 
-  rawType :: (Expression Ann) -> Type
-  rawType a = TInteger
+  assign :: (Expression Ann) -> (Expression Ann) -> Check Bool
+  assign a b = do
+    ra <- rawType $ typeOf a
+    rb <- rawType $ typeOf b
+
+    return $ (typeOf a == typeOf b) || (ra == typeOf b) || (rb == typeOf a)
+
+  rawType :: (Type) -> Check Type
+  rawType (TypeName t) = (checkVar t) >>= (\x -> rawType x)
+  rawType a = return $ a
+
+  isPrim :: (Expression a) -> Bool
+  isPrim (Integer _)   = True
+  isPrim (Float _)     = True 
+  isPrim (IntString _) = True
+  isPrim (RawString _) = True
+  isPrim (Rune _)      = True
+  isPrim (Bool _)      = True
+  isPrim _             = False
 
   typeOf :: (Expression Ann) -> Type
   typeOf (Integer _)        = TInteger
@@ -239,6 +280,7 @@ module MGC.Type where
   typeOf (RawString _)      = TString
   typeOf (Rune _)           = TRune
   typeOf (Bool _)           = TBool
+  typeOf (Conversion t _)   = t
   typeOf (BinaryOp t _ _ _) = t
   typeOf (UnaryOp t _ _)    = t
   typeOf (Index t _ _)      = t

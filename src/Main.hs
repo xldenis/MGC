@@ -46,7 +46,8 @@ handleFile fname = do
     Left _ -> putStrLn $ fname ++ " got ParseError"
     Right ast -> case runWeeder ast of 
       Left err -> putStrLn $ fname ++ " got " ++ (show err)
-      Right _ -> do
+      Right ast -> do
         putStrLn $ fname ++ " " ++ "parsed"
-        --putStrLn $ prettyShow $ pretty ast
-        --writeFile (replaceExtension (fname) "pretty.go") $ prettyShow $ pretty ast
+        case (typecheck ast) of
+          (Right _,_)-> putStrLn "Typechecked"
+          (Left err, (l,_,_)) -> putStrLn $ show err ++ "\n" ++ l        

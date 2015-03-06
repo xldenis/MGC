@@ -121,7 +121,7 @@ module MGC.Parser.Prim where
 
   literal = basicLit <?> "literal value"
 
-  basicLit = floatLit <|> intLit <|> stringLit <|> runeLit
+  basicLit = floatLit <|> intLit <|> stringLit <|> runeLit <|> boolLit
 
   runeLit :: Parser (Expression ()  ) -- consider switching back to readLitChar
   runeLit = Rune <$> quotes' (byteLit <|> (flip (:) [] <$> noneOf "'\n\\") <|> escapeSeq )
