@@ -44,7 +44,7 @@ module MGC.Parser.Prim where
   semi = lexeme ";" >> return ()
 
   semi' = (try $ lineSpace >> lexeme' ";" >> return ()) <|> 
-    (try $ lineSpace >> ((char '\n' >> return  ()) <|>  singleComment <|> fullComment) >> fullSpace) <?> "Termination"
+    (try $ lineSpace >> ((lookAhead (char '}' >> return ())) <|> (char '\n' >> return  ()) <|>  singleComment <|> fullComment) >> fullSpace) <?> "Termination"
 
   lexeme :: String -> Parser String
   lexeme s = try $ string s <* lineSpace

@@ -1,6 +1,7 @@
 package valid_switch
-func x() {
   type a struct{ x int }
+
+func x() {
   var y a
   switch x := 1; x /* int */ < 1 /* bool */ {
     case true:
