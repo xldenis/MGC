@@ -33,6 +33,9 @@ compile fname args = do
         case (astPrint args) of
           True -> putStrLn $ show $ ast
           _ -> return ()
+        case (typecheck ast) of
+          (Right _,_)-> putStrLn "Typechecked"
+          (Left err, (l,_,_)) -> putStrLn $ show err ++ "\n" ++ l
         putStrLn $ prettyShow $ pretty ast
         writeFile (replaceExtension (fname) "pretty.go") $ prettyShow $ pretty ast
 

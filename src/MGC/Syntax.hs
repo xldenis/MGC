@@ -40,23 +40,6 @@ module MGC.Syntax where
     | Eq | NEq | LessThan | LessThanEq | GreaterThan | GreaterThanEq
     | Plus | Minus | BitOr | BitXor
     | Mult | Div | Mod | LShift | RShift | BitAnd | BitClear  deriving (Show, Eq)
-    
-  isMulOp :: BinOp -> Bool
-  isMulOp Mult      = True
-  isMulOp Div       = True
-  isMulOp Mod       = True
-  isMulOp LShift    = True
-  isMulOp RShift    = True
-  isMulOp BitAnd    = True
-  isMulOp BitClear  = True
-  isMulOp _         = False
-
-  isAddOp :: BinOp -> Bool
-  isAddOp Plus    = True
-  isAddOp Minus   = True
-  isAddOp BitOr   = True
-  isAddOp BitXor  = True
-  isAddOp _       = False
 
   data UOp = Pos | Neg | Not | BComp  deriving (Show, Eq)
 
@@ -83,6 +66,7 @@ module MGC.Syntax where
   data SwitchClause a
     = Default [Statement a]
     | Case [Expression a] [Statement a] deriving (Show, Eq)
+  
   data Type
     = TypeName Identifier 
     | Array Int Type 
@@ -98,10 +82,64 @@ module MGC.Syntax where
     | TNil
     | TBool deriving (Show, Eq)
 
-
   data FieldDecl  
     = NamedField [Identifier] Type (Maybe String) 
     | AnonField Type (Maybe String) deriving (Show, Eq)
   data MethodSpec 
     = MethodSpec Identifier Signature 
     | InterfaceName Identifier  deriving (Show, Eq)
+
+  isMulOp :: BinOp -> Bool
+  isMulOp Mult      = True
+  isMulOp Div       = True
+  isMulOp Mod       = True
+  isMulOp LShift    = True
+  isMulOp RShift    = True
+  isMulOp BitAnd    = True
+  isMulOp BitClear  = True
+  isMulOp _         = False
+
+  isAddOp :: BinOp -> Bool
+  isAddOp Plus    = True
+  isAddOp Minus   = True
+  isAddOp BitOr   = True
+  isAddOp BitXor  = True
+  isAddOp _       = False
+
+  isNum TInteger = True
+  isNum TFloat   = True
+  isNum TRune    = True
+  isNum _        = False
+
+  isInt TInteger = True
+  isInt TRune    = True
+  isInt _        = False
+
+  isOrd TInteger = True
+  isOrd TRune    = True
+  isOrd TString  = True
+  isOrd _        = False
+
+  isNumOp Plus  = True
+  isNumOp Minus = True
+  isNumOp Mult  = True
+  isNumOp Div   = True
+  isNumOp _     = False
+
+  isOrdOp LessThan      = True
+  isOrdOp LessThanEq    = True
+  isOrdOp GreaterThan   = True
+  isOrdOp GreaterThanEq = True
+  isOrdOp _             = False
+
+  isIntOp BitOr     = True
+  isIntOp BitAnd    = True
+  isIntOp LShift    = True
+  isIntOp RShift    = True
+  isIntOp BitClear  = True
+  isIntOp BitXor    = True
+  isIntOp _         = False
+  
+  isCmpOp Eq        = True
+  isCmpOp NEq       = True
+  isCmpOp _         = False
