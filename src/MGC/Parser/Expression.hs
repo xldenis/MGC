@@ -58,13 +58,13 @@ module MGC.Parser.Expression  where
       Just x -> consumePrimaryExpr x
 
   operand :: Parser (Expression ())
-  operand = (literal <|>  args <|> name <|> conversion <|> (parens expression)) <* lineSpace
+  operand = (literal <|> conversion <|>  args <|> name <|> (parens expression)) <* lineSpace
 
   name :: Parser (Expression ())
   name = (Name () <$> identifier) <|> (QualName <$> identifier <*> identifier)
 
   conversion :: Parser (Expression ())
-  conversion = try $ Conversion <$>  typeParser <*> (parens $ expression <* (optional $ lexeme "," ))
+  conversion = try $ Conversion <$>  builtins <*> (parens $ expression <* (optional $ lexeme "," ))
 
   selector :: (Expression ()) -> Parser (Expression ())
   selector e = try $ do{lexeme' "."; i <- identifier;  return $ Selector () e i}

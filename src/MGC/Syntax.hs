@@ -54,10 +54,10 @@ module MGC.Syntax where
     | ExpressionStmt (Expression a)
     | Fallthrough
     | For (Maybe (ForCond a)) (Statement a)
-    | If (Maybe (Statement a)) (Expression a) (Statement a) (Statement a)
+    | If (Statement a) (Expression a) (Statement a) (Statement a)
     | Inc (Expression a)
     | ShortDecl [Identifier] [Expression a]
-    | Switch (Maybe (Statement a)) (Maybe (Expression a)) [SwitchClause a]
+    | Switch (Statement a) (Maybe (Expression a)) [SwitchClause a]
     | TypeDecl [TypeSpec]
     | VarDecl [VarSpec a] deriving (Show, Eq)
 

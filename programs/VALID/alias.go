@@ -7,5 +7,5 @@ type b a
 type c b
 
 func x() {
-  var a c = 1
+  var a c = c(1)
 }

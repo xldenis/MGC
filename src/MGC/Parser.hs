@@ -90,7 +90,7 @@ module MGC.Parser where
   ifStmt :: Parser (Statement ())
   ifStmt = do
     reserved "if"  
-    stmt <- optionMaybe (try $ (simpleStatement <|> (return Empty)) <* semi)
+    stmt <- option Empty (try $ (simpleStatement <|> (return Empty)) <* semi)
     expr <- expression
     left <- blockStmt
     right <- (reserved' "else" >> (ifStmt <|> blockStmt)) <|> return Empty
@@ -99,7 +99,7 @@ module MGC.Parser where
   switchStmt :: Parser (Statement ())
   switchStmt = do
     reserved "switch"
-    stmt <- optionMaybe $ try $ simpleStatement <* semi
+    stmt <- option Empty $ try $ simpleStatement <* semi
     expr <- optionMaybe expression
     clauses <- braces' (many exprCaseClause) 
     return $ Switch stmt expr clauses

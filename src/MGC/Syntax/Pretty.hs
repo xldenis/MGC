@@ -20,7 +20,7 @@ module MGC.Syntax.Pretty where
     pretty :: a -> Doc
     prettyList :: [a] -> Doc
     prettyList lst = VUnion 0 (map pretty lst)
- 
+
   instance Pretty a => Pretty [a] where 
     pretty x = prettyList x
 
@@ -65,6 +65,11 @@ module MGC.Syntax.Pretty where
   (HUnion in1 s) <+> (VUnion in2 t) = HUnion in1 $ s ++ [(head t), (VUnion in2 (tail t))]
   (HUnion in1 s) <+> c = HUnion in1 $ s ++ [char ' ', c]
 
+  (<?>) :: Doc -> Doc -> Doc
+  a <?> EmptyDoc = empty
+  EmptyDoc <?> a = empty
+  a <?> b = a <+> b
+
   ($$) :: Doc -> Doc -> Doc
   a $$ (VUnion _ []) = a
   (Doc in1 s) $$ a = VUnion in1 ((Doc 0 s):[a])
@@ -96,6 +101,12 @@ module MGC.Syntax.Pretty where
   quotes :: Doc -> Doc
   quotes d = (char '"') <> d <> (char '"')
 
+  comment :: Doc -> Doc
+  comment c = (text "/*") <?> c <?> (text "*/")
+
+  annotate :: Pretty a => a -> Doc
+  annotate = comment . pretty 
+
   float :: Float -> Doc
   float f = Doc 0 (show f)
 
@@ -115,10 +126,10 @@ module MGC.Syntax.Pretty where
   prettyShow' n (HUnion ind s) = (prettyShow' (ind+n) (head s)) ++ (concatMap (prettyShow' 0) (tail s))
   prettyShow' _ EmptyDoc = ""
 
-  instance Pretty (Package a) where
+  instance Pretty a => Pretty (Package a) where
     pretty (Package name content) = text "package" <+> text name <+> text "\n\n" <> (pretty content)
 
-  instance Pretty (TopLevelDeclaration a) where
+  instance Pretty a => Pretty (TopLevelDeclaration a) where
     prettyList decs = foldl (<>) empty $ intersperse (text "\n\n") $ map pretty decs
 
     pretty (FunctionDecl ident sig body) = text "func" <+> 
@@ -128,7 +139,7 @@ module MGC.Syntax.Pretty where
   instance Pretty TypeSpec where
     pretty (TypeSpec ident tp) = (text ident) <+> (pretty tp)
 
-  instance Pretty (VarSpec a) where
+  instance Pretty a => Pretty (VarSpec a) where
     pretty (VarSpec idents vals tp) = (text $ intercalate ", " idents) <+> (pretty tp) <+> (
       if (length vals) > 0
       then (text "=") <+> (pretty vals)
@@ -141,12 +152,12 @@ module MGC.Syntax.Pretty where
     prettyList params = foldl (<>) empty $ intersperse (text ", ") $ map pretty params
     pretty (Parameter idents tp) = text (intercalate ", " idents) <+> (pretty tp)
   
-  instance Pretty (Statement a) where
+  instance Pretty a => Pretty (Statement a) where
     pretty (Return exps) = text "return" <+> pretty exps-- not done
-    pretty (If stmt exp left right) = text "if" <+> 
-      (case stmt of
-        Nothing -> empty
-        Just a  -> (pretty a <+> text ";")) <+>
+    pretty (If stmt exp left right) = text "if" <+>(case stmt of
+        Empty -> empty
+        s -> (pretty s) <> (char ';')
+      )<+>
       (pretty exp) <+> 
       (pretty left) <+> 
       (case right of
@@ -154,8 +165,8 @@ module MGC.Syntax.Pretty where
         _ -> text "else" <+> pretty right)
 
     pretty (For cond body) = text "for" <+> (pretty cond) <+> (pretty body)
-    pretty (Switch s@(Just _) e body) = text "switch" <+> (pretty s) <> (char ';') <+> (pretty e) <+> (braces $ nest 2 $ pretty body)
-    pretty (Switch _ e body) = text "switch" <+> (pretty e) <+> (braces $ nest 2 $ pretty body)
+    pretty (Switch Empty e body) = text "switch" <+> (pretty e) <+> (braces $ nest 2 $ pretty body)
+    pretty (Switch s e body) = text "switch" <+> (pretty s) <> (char ';') <+> (pretty e) <+> (braces $ nest 2 $ pretty body)
     pretty Continue = text "continue"
     pretty Break = text "break"
     pretty (Block stmt) = braces $ (nest 2 (pretty stmt))
@@ -173,11 +184,11 @@ module MGC.Syntax.Pretty where
       then pretty (head vars)
       else parens' $ nest 2 $ pretty vars)
 
-  instance Pretty (SwitchClause a) where
+  instance Pretty a => Pretty (SwitchClause a) where
     pretty (Default body) = text "default:" $$ (nest 2 $ pretty body) 
     pretty (Case e  body) = text "case" <+> pretty e <> (char ':') $$ (nest 2 $ pretty body)
 
-  instance Pretty (ForCond a) where
+  instance Pretty a => Pretty (ForCond a) where
     pretty (Condition exp) = pretty exp
     pretty (ForClause low cond nxt) = (pretty low) <> (char ';') <+> (pretty cond) <> (char ';') <+> (pretty nxt)
 
@@ -196,6 +207,7 @@ module MGC.Syntax.Pretty where
     pretty TString = text "string"
     pretty TRune = text "rune"
     pretty TBool = text "bool"
+    pretty TNil = empty
 
   instance Pretty FieldDecl where
     pretty (NamedField nm tp t) = (foldl (<>) empty $ intersperse (text ", ") $ map text nm) <+> (pretty tp) <+> (
@@ -209,17 +221,17 @@ module MGC.Syntax.Pretty where
   instance Pretty MethodSpec where
     pretty _ = empty
 
-  instance Pretty (Expression a) where
+  instance Pretty a => Pretty (Expression a) where
     prettyList exps = foldl (<>) empty $ intersperse (text ", ") $ map pretty exps
 
-    pretty (BinaryOp _ op lhs rhs) = (pretty lhs) <+> (pretty op) <+> (pretty rhs)
-    pretty (UnaryOp _ op exp) = (pretty op) <> (pretty exp)
-    pretty (Conversion tp exp) = (pretty tp) <> (parens $ pretty exp)
-    pretty (Selector _ exp ident) = (pretty exp) <> (char '.') <> (text ident)
-    pretty (Index _ exp ind)  = (pretty exp) <> (brackets $ pretty ind)
-    pretty (SimpleSlice _ sliced lower upper) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper))
-    pretty (FullSlice _ sliced lower upper dir) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper) <> (char ':') <> (pretty dir))
-    pretty (Name _ ident) = text ident
+    pretty (BinaryOp t op lhs rhs) = (pretty lhs) <+> (pretty op) <+> (pretty rhs) <+> (annotate t)
+    pretty (UnaryOp t op exp) = (pretty op) <> (pretty exp)  <+> (annotate t)
+    pretty (Conversion tp exp) = (pretty tp) <> (parens $ pretty exp) <+> (annotate tp)
+    pretty (Selector t exp ident) = (pretty exp) <> (char '.') <> (text ident) <+> (annotate t)
+    pretty (Index t exp ind)  = (pretty exp) <> (brackets $ pretty ind) <+> (annotate t)
+    pretty (SimpleSlice t sliced lower upper) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper))
+    pretty (FullSlice t sliced lower upper dir) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper) <> (char ':') <> (pretty dir))
+    pretty (Name t ident) = text ident <+> (annotate t)
     pretty (QualName pkg ident) = (text pkg) <> (char '.') <> (text ident)
     pretty (Integer val) = int val
     pretty (Rune ch) = text ch
@@ -229,6 +241,7 @@ module MGC.Syntax.Pretty where
     pretty (IntString str) = intString ( str)
     pretty (Arguments _ expr args) = (pretty expr) <> (parens $ pretty args)
 
+  instance Pretty () where pretty () = empty
   instance Pretty BinOp where
     pretty op = text (fst.head $ filter (\(el) -> (snd el) == op) binaryOps)
   instance Pretty UOp where
