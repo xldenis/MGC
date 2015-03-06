@@ -3,7 +3,7 @@ package variable_scopes
 func x() {
   var x int
   {
-    var x float
+    var x float64
     {
       var x string
       x = "sss"

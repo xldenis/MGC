@@ -2,7 +2,7 @@ package alias
 
 type a int
 
-func() {
-  type a float
+func x() {
+  type a float64
   var x a = 1 // should be a type error
 }
