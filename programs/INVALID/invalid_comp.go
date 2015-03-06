@@ -1,4 +1,4 @@
-package valid_comp
+package invalid_comp
 
 type a int
 
