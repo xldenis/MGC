@@ -36,9 +36,9 @@ module MGC.Parser.PrimSpec (spec) where
         it "recognizes normal chars" $ do
           runeLit `parses` "'a'" ~> (Rune "a")
         it "recognizes octal bytes" $ do
-          runeLit `parses` "'\\000'" ~> (Rune "\000")
+          runeLit `parses` "'\\000'" ~> (Rune "\\000")
         it "recognizes hex bytes" $ do
-          runeLit `parses` "'\\x00'" ~> (Rune "\x00")
+          runeLit `parses` "'\\x00'" ~> (Rune "\\x00")
 
     describe "identifier" $ do
       it "recognizes strings" $ do

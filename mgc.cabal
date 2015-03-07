@@ -76,4 +76,6 @@ test-suite tests
                       hspec >= 2.1.4,
                       hspec-expectations,
                       bytestring == 0.10.4.0,
+                      mtl,
+                      containers,
                       neat-interpolation
