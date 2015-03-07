@@ -33,6 +33,7 @@ module MGC.Check where
     | NoNewVars
     | NotInScope String
     | RedeclaredType String
+    | MissingMain
     | RedeclaredVar String deriving Show
 
   type Check = ExceptT TypeError (State (String, Counters, Env))
@@ -46,7 +47,13 @@ module MGC.Check where
     checkList = mapM (check)
 
   instance Checkable Package where
-    check (Package name pkg) = Package name <$> (pushScope >> (checkList pkg) <* popScope)
+    check (Package name pkg) = do
+      pushScope
+      pkg' <- checkList pkg
+      main <- decl "main"
+      when (name == "main" && not main) $ throwError MissingMain
+      popScope
+      return $ Package name pkg'
 
   instance Checkable TopLevelDeclaration where
     check (Decl t@(TypeDecl _)) = Decl <$> (check t)
@@ -56,14 +63,14 @@ module MGC.Check where
       pushScope
       mapM (\(Parameter idens tp) -> mapM (\nm -> addVar nm tp) idens) $ (\(Signature s _) -> s) sig
       let ret = map (\(Parameter _ tp) -> tp) $ (\(Signature _ s) -> s) sig
-      (a,tp,c) <- get
-      put (a, (tp {ret = (ReturnType ret)}), c)
+      let fRet = if length ret == 0 then TNil else ReturnType ret
+      modify (\(l,st, e) -> (l, (st {ret= fRet}), e)) 
       b <- case body of
         Block s -> Block <$> (checkList s)
         Empty -> return Empty
         _ -> throwError $ ImpossibleError "Invalid function body"
       popScope
-      put (a, tp, c)
+      modify (\(l,st, e) -> (l, (st {ret= TNil}), e)) 
       return $ FunctionDecl name sig b
     check (Decl _ ) = throwError $ ImpossibleError "Top Level Declaration invalid"
 

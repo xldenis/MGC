@@ -1,13 +1,15 @@
-package main
+package main 
 
+type X int
 func x() int {
-  if true {
+  switch {
+  case:
     return 1
-  } else {
+  default:
     return 1
   }
 }
 
 func main() {
-  
+
 }
