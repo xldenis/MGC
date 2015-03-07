@@ -55,12 +55,15 @@ module MGC.Check where
       addVar name $ Function sig
       pushScope
       mapM (\(Parameter idens tp) -> mapM (\nm -> addVar nm tp) idens) $ (\(Signature s _) -> s) sig
-      
+      let ret = map (\(Parameter _ tp) -> tp) $ (\(Signature _ s) -> s) sig
+      (a,tp,c) <- get
+      put (a, (tp {ret = (ReturnType ret)}), c)
       b <- case body of
         Block s -> Block <$> (checkList s)
         Empty -> return Empty
         _ -> throwError $ ImpossibleError "Invalid function body"
       popScope
+      put (a, tp, c)
       return $ FunctionDecl name sig b
     check (Decl _ ) = throwError $ ImpossibleError "Top Level Declaration invalid"
 
@@ -76,6 +79,7 @@ module MGC.Check where
       e <- checkList exps
       case (ret tp) of
         ReturnType t -> when (t /= (map typeOf e)) $ throwError $ InvalidReturn 
+        TNil -> when (length e /= 0) $ throwError $ InvalidReturn
         _ -> throwError $ ImpossibleError "got non return type as function return"
       return $ Return e
     check (If stmt exp l r) = do -- check type
