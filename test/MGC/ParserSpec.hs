@@ -38,11 +38,11 @@ module MGC.ParserSpec (spec) where
 
     describe "if statement" $ do
       it "works with one branch" $ do
-        ifStmt `parses` "if 0 {1++}" ~> (If (Nothing) (Integer 0) (Block [Inc (Integer 1)]) Empty)
+        ifStmt `parses` "if 0 {1++}" ~> (If Empty (Integer 0) (Block [Inc (Integer 1)]) Empty)
       it "works with simpleStatements" $ do
-        ifStmt `parses` "if 0; 0 {1}" ~> (If (Just (ExpressionStmt (Integer 0))) (Integer 0) (Block [ExpressionStmt (Integer 1)]) Empty)
+        ifStmt `parses` "if 0; 0 {1}" ~> (If (ExpressionStmt (Integer 0)) (Integer 0) (Block [ExpressionStmt (Integer 1)]) Empty)
       it "works with else branch" $ do
-        ifStmt `parses` "if 0 {1}else{0}" ~> (If Nothing (Integer 0) (Block [(ExpressionStmt (Integer 1))]) (Block [(ExpressionStmt (Integer 0))]))
+        ifStmt `parses` "if 0 {1}else{0}" ~> (If Empty (Integer 0) (Block [(ExpressionStmt (Integer 1))]) (Block [(ExpressionStmt (Integer 0))]))
       it "works with else if branch" $ do
         let test = [string| 
           if 0 {
@@ -51,7 +51,7 @@ module MGC.ParserSpec (spec) where
             0
           }
         |]
-        let expected =  (If Nothing (Integer 0) (Block [(ExpressionStmt (Integer 1))]) (If Nothing (Integer 1) (Block [(ExpressionStmt (Integer 0))]) Empty) )
+        let expected =  (If Empty (Integer 0) (Block [(ExpressionStmt (Integer 1))]) (If Empty (Integer 1) (Block [(ExpressionStmt (Integer 0))]) Empty) )
         ifStmt `parses` test ~> expected
 
     describe "return" $ do
@@ -83,26 +83,26 @@ module MGC.ParserSpec (spec) where
 
     describe "switch" $ do
       it "parses expression switches" $ do
-        switchStmt `parses` "switch 0 {\ndefault:\n1}" ~> (Switch Nothing (Just (Integer 0)) [(Nothing, [ExpressionStmt (Integer 1)])])
+        switchStmt `parses` "switch 0 {\ndefault:\n1}" ~> (Switch Empty (Just (Integer 0)) [Default [ExpressionStmt (Integer 1)]])
       it "parses empty switches" $ do
-        switchStmt `parses` "switch {}" ~> (Switch Nothing Nothing [])
+        switchStmt `parses` "switch {}" ~> (Switch Empty Nothing [])
       it "parses statement switches" $ do
-        switchStmt `parses` "switch 0; {}" ~> (Switch (Just (ExpressionStmt (Integer 0))) Nothing [])
+        switchStmt `parses` "switch 0; {}" ~> (Switch ((ExpressionStmt (Integer 0))) Nothing [])
       it "parses expression & statement switches" $ do
-        switchStmt `parses` "switch 0; 0 {\n}" ~> (Switch (Just (ExpressionStmt (Integer 0))) (Just (Integer 0)) [])
+        switchStmt `parses` "switch 0; 0 {\n}" ~> (Switch ((ExpressionStmt (Integer 0))) (Just (Integer 0)) [])
 
     describe "function declarations" $ do
       it "parses function signatures" $ do
-        funcDec `parses` "func flushICache(begin, end uintptr)" ~> (FunctionDecl "flushICache" (Signature [Parameter ["begin", "end"] (TypeName "uintptr")] [])  Nothing)
+        funcDec `parses` "func flushICache(begin, end uintptr)" ~> (FunctionDecl "flushICache" (Signature [Parameter ["begin", "end"] (TypeName "uintptr")] [])  Empty)
       it "parses func x(int) int" $ do
-        funcDec `parses` "func x(int) int " ~> FunctionDecl "x" (Signature [Parameter [] TInteger] [Parameter [] TInteger]) Nothing
+        funcDec `parses` "func x(int) int " ~> FunctionDecl "x" (Signature [Parameter [] TInteger] [Parameter [] TInteger]) Empty
       it "parses full functions" $ do
         let test = [string|
           func x(y int) bool {
             y++
           }
         |]
-        let expected = FunctionDecl "x" (Signature [Parameter ["y"] TInteger] [Parameter [] TBool]) (Just $ Block [Inc (Name () "y")])
+        let expected = FunctionDecl "x" (Signature [Parameter ["y"] TInteger] [Parameter [] TBool]) (Block [Inc (Name () "y")])
         funcDec `parses` test ~> expected
 
     describe "simpleStatement" $ do

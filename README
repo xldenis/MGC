@@ -3,6 +3,9 @@ Student ID: 260521681
 Xavier Denis
 
 
-To build this project run the command `cabal install --only-dependencies` followed by `cabal build`
+To build this project run the command 
+  cabal sandbox init
+  cabal install --upgrade-dependencies --constraint="template-haskell installed" --dependencies-only --enable-tests
+  cabal build
 
 This will build the binary in `dist/mgc/mgc`
