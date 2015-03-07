@@ -6,7 +6,7 @@ import System.Console.CmdArgs
 import System.Environment (withArgs, getArgs)
 
 import MGC.Syntax.Pretty
-import MGC.Type
+import MGC.Check
 import MGC.Syntax.Weeder (runWeeder)
 
 import Control.Applicative ((<$>), (<*))

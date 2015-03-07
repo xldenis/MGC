@@ -25,7 +25,7 @@ library
     MGC.Syntax
     MGC.Syntax.Pretty
     MGC.Syntax.Weeder
-    MGC.Type
+    MGC.Check
     MGC
 
   build-depends:       base >=4.7 && <4.8,

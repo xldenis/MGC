@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 
-module MGC.Type where
+module MGC.Check where
   import qualified Data.Map as M
   import Data.Map (Map)
   import MGC.Syntax
