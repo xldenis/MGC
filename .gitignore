@@ -2,5 +2,20 @@ dist/
 .cabal-sandbox/
 .DS_Store
 .mgc.sublime*
+# GoLite output files
 *.pretty.go
+*.pptype.go
+*.symtab
+# Cabal generated files
 *.config
+
+# Latex build files
+doc/*.aux
+doc/*.aux
+doc/*.bbl
+doc/*.bcf
+doc/*.blg
+doc/*.fdb_latexmk
+doc/*.log
+doc/*.run.xml
+doc/*.synctex.gz

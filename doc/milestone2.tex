@@ -2,7 +2,7 @@
 \documentclass[11pt]{article}
 
 \usepackage[parfill]{parskip}
-
+\usepackage{listings}
 \usepackage[style=ieee]{biblatex}
 \addbibresource{references.bib}
 
@@ -44,17 +44,62 @@
 \maketitle
 
 \section {Design Decisions}
-For this project I opted to use the Haskell. Haskell itself offers many advantages such as it's very power type system which allows for many errors to be caught in a static manner. Additionally, the AST can be easily represented using standard Haskell types. While the type system and core language of Haskell are very powerful and useful, the primary reason for using it is the library ecosystem. Parsec, a monadic parser combinator library provides a set of simple, powerful tools which allow for the lexer and parser to be combined in a legible manner. Parsec also provides utilities to parse entire expression trees very rapidly. The primary downside of using Haskell is the learning curve that is associated with monads and other abstract constructs. While this hindered me at first, I was able to rapidly adapt and pick up more advanced and efficient patterns.
+While Haskell provides a natural interface for many recursive tasks, building a typed AST and the requirements to return the symbol table posed a few challenges. 
 
-\section {Implementation Decisions}
+In the Haskell community the AST Typing problem has no definitive solution. Haskell itself uses an explicitly typed AST which gets built during typechecking. Other approaches include building an infinite type using Fixed points of the types and exploiting the Cofree-Comonad (whatever that means). The downside of these approaches is that it makes pattern matching much more difficult.  Instead, I opted to use an intermediate approach, that is I parameterized all types containing `Expression' over `a'. By adding `a' to all the constructors of `Expression' I can attach any information I wish to expressions.
 
-The code is split into several modules which encompass the different subjects of the language. Within the top-level `MGC' (Montreal GoLit Compiler), there are two other modules. 
+I chose to model the actual typechecker through another typeclass called `Checkable'. This simplifies the code slightly, since all checker methods share a name. It fits nice into the semantics of typeclasses which are used to express a common behaviour shared by types.
+\begin{figure}
+\begin{lstlisting}
+type Check = ExceptT TypeError (State (String, Counters, Env))
+type Ann = Type
+class Checkable a where
+  check :: a -> (Check (a Ann))
+\end{lstlisting}
+\end{figure}
 
-The `Syntax' module contains a definition of the AST and all related data types. It also handles representation of the AST, that is, pretty-printing. Pretty-printing is handled in the `MGC.Syntax.Pretty' module, it contains an abstract implementation of a simple pretty-printing typeclass and the concrete implementations for each type of the AST. 
+The definition given above, which is used in the code causes a problem. The type `a' has kind $* \rightarrow *$, however, Haskell does not support polymorphic instance declarations for higher kinded types by default. In my previous typeclasses (Pretty, Weeder), I exploited these polymorphic instances to simplify dealing with `Maybe a' and `[a]'. This meant that the code would be slightly more verbose than was strictly required. 
 
-The `Parser' module consists of 4 parts. The first, `Prim', contains the basic blocks of the language and many helper methods, it handles parsing of literals, parentheses, braces, white-space and comments. The `Expression' module handles the parsing of all Go expressions. The `Type' module parses all go types including user defined types. Finally, the main `Parser' module contains the actual definition of the language putting together the previous module to form the statments, variable and type declarations that make up go. 
+Returning the symbol table on scope exit causes a few problems of it's own, most notably it unreasonable to not use the `State' monad to carry the log through the check. However, since the `Either' monad was already being used to represent abortable computation, monad transformers were required to combine both monads together. While monad transformers are great tools, they can come with a performance penalty of up to $300\%$.
 
-There is a single area of concern in the structure of the implementation. The `Type' and `Expression' modules are mutually dependent and required a special trick to allow the Haskell compiler to compile the modules. While this shouldn't impact future development, it is worth bringing up.
+\section {Scoping Rules}
+There are 3 major scoping cases:
+\begin {enumerate}
+  \item Functions: When functions are created, we open a scope to push all the parameters into. Since function bodies are represented by a block statement and would normally open another scope, we manually read out the statements in the function to avoid parameter shadowing.
+  \item If/Switch/For: These statements can have statements in their condition clauses, so we open a scope to process these statements.
+  \item Block: Block statements are used to represent all blocks in curly braces, including If statements or For loops. These open a scope when they process and pop it when the close.
+\end {enumerate}
 
-Seperately from the main source code directory is the  `test' directory. This contains tests for many (but not all) of the codebase. Some tests were not defined due to time restrictions or simply were found to be unnecessary (not testing useful properties).
+\section {Type Rules}
+There are a \textit{many} type rules used. Briefly they can fall into 3 major sections:
+\begin {enumerate}
+  \item Type: These checks focused on properly adding types to the symbol table. Additionally, they deal with all the scoping issues that happen when nested types share the same name. Relevant tests: 
+    \begin{enumerate}
+      \item INVALID/alias.go
+      \item INVALID/tricky\_alias.go
+      \item INVALID/invalid\_if.go
+      \item VALID/tricky\_alias.go
+      \item VALID/alias.go
+      \item VALID/var\_scopes.go
+    \end{enumerate}
+  \item Expression: These checks focus on checking all expressions according the go and golite specs. They also make sure to assign the correct type to the expression so that future operations succeed. Relevant tests:
+    \begin{enumerate}
+      \item INVALID/invalid\_comp.go
+      \item INVALID/assign.go
+      \item VALID/valid\_slice.go \textit{append is treated as a function invocation (expression)}
+      \item VALID/var\_scopes.go
+    \end{enumerate}
+  \item Statement: These checks are mainly focused on correct recursion. Certain statements such as for/if/switch also require secondary checks. Relevant tests:
+    \begin{enumerate}
+      \item INVALID/invalid\_dec.go
+      \item INVALID/invalid\_if.go
+      \item VALID/for.go
+      \item VALID/valid\_slice.go
+      \item VALID/valid\_switch.go
+    \end{enumerate}
+\end {enumerate}
+\section {Work Split}
+
+I, Xavier Denis, did this entire milestone.
+
 \end{document}
