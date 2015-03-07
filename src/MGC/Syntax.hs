@@ -20,7 +20,7 @@ module MGC.Syntax where
   data Expression a
    = BinaryOp a BinOp (Expression a) (Expression a)
    | UnaryOp a UOp (Expression a)
-   | Conversion Type (Expression a)
+   | Conversion a Type (Expression a)
    | Selector a (Expression a) Identifier
    | Index a (Expression a) (Expression a)
    | SimpleSlice a (Expression a) (Expression a) (Expression a)

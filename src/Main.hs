@@ -3,6 +3,7 @@ import MGC.Parser
 import Text.Parsec
 import System.FilePath.Posix
 import System.Console.CmdArgs
+import System.Environment (withArgs, getArgs)
 
 import MGC.Syntax.Pretty
 import MGC.Type
@@ -22,8 +23,16 @@ opts = Options{
   files = [] &= args 
 }
 
+munge "-pptype"     = "--pptype"
+munge "-dumpsymtab" = "--dumpsymtab"
+munge a = a
 main :: IO ()
 main = do
+  realArgs <- getArgs
+  withArgs (map munge realArgs) realMain
+
+realMain :: IO ()
+realMain = do
   args <- cmdArgs opts
   case (test args) of
     False -> compile (head $ files args) args
@@ -40,10 +49,12 @@ compile fname args = do
         case (typecheck ast) of
           (Left err, (l,_,_)) -> do
             putStrLn $ show err ++ "\n" ++  l
-            saveFile fname "symtab" l
+            if (dumpsymtab args) then saveFile fname "symtab" l else return ()
           (Right typedAst, (l,_,_)) -> do
             putStrLn l
             putStrLn $ prettyShow $ pretty typedAst
+            if (dumpsymtab args) then saveFile fname "symtab" l else return ()
+            if (pptype args) then saveFile fname "pptype.go" (prettyShow $ pretty typedAst) else return ()
             saveFile fname "pretty.go" $ prettyShow $ pretty ast
 
 saveFile :: String -> String -> String -> IO ()

@@ -32,7 +32,8 @@ module MGC.Type where
     | MissingField Type Identifier
     | NoNewVars
     | NotInScope String
-    | RedeclaredVar deriving Show
+    | RedeclaredType String
+    | RedeclaredVar String deriving Show
 
   type Check = ExceptT TypeError (State (String, Counters, Env))
   type Ann = Type
@@ -51,9 +52,9 @@ module MGC.Type where
     check (Decl t@(TypeDecl _)) = Decl <$> (check t)
     check (Decl v@(VarDecl  _)) = Decl <$> (check v)
     check (FunctionDecl name sig body) = do
-      modify (addVar name $ Function sig)
+      addVar name $ Function sig
       pushScope
-      mapM (\(Parameter idens tp) -> mapM (\nm -> modify (addVar nm tp)) idens) $ (\(Signature s _) -> s) sig
+      mapM (\(Parameter idens tp) -> mapM (\nm -> addVar nm tp) idens) $ (\(Signature s _) -> s) sig
       
       b <- case body of
         Block s -> Block <$> (checkList s)
@@ -65,7 +66,7 @@ module MGC.Type where
 
   instance Checkable Statement where
     check (TypeDecl tps) = do
-      mapM (\(TypeSpec n tp) -> modify $ addType n tp) tps
+      mapM (\(TypeSpec n tp) -> addType n tp) tps
       return $ TypeDecl tps
     check (VarDecl vars) = do
       tps <- checkList vars
@@ -154,7 +155,7 @@ module MGC.Type where
           if v == (typeOf e)
           then return (typeOf e)
           else throwError NoNewVars
-        False -> modify (addVar id (typeOf e)) >> return (typeOf e) ) $ zip3 decls idents e
+        False -> addVar id (typeOf e) >> return (typeOf e) ) $ zip3 decls idents e
       return $ ShortDecl idents e
     check (Empty) = return Empty
     check (Continue) = return Continue
@@ -169,13 +170,13 @@ module MGC.Type where
   instance Checkable VarSpec where
     check (VarSpec idens exps Nothing) = do -- dont ignore tp check double declarations
       tps <- checkList exps
-      mapM (\(i, t) -> modify (addVar i (typeOf t)) ) $ zip idens tps
+      mapM (\(i, t) ->addVar i (typeOf t) ) $ zip idens tps
       return $ VarSpec idens tps Nothing
     check (VarSpec idens exps (Just t)) = do
       tps <- checkList exps
       trueT <- alias t
       when (any ((trueT /=).typeOf ) tps) $ throwError $ InvalidVarDec t tps
-      mapM (\i -> modify (addVar i trueT) ) idens
+      mapM (\i -> addVar i trueT ) idens
       return $ VarSpec idens tps (Just t)
 
 
@@ -206,14 +207,14 @@ module MGC.Type where
         Not   -> when (not$ (==TBool) (typeOf rh)) $ throwError (InvalidUOp op rh)
         BComp -> when (not$ isInt (typeOf rh))     $ throwError (InvalidUOp op rh)
       return $ UnaryOp (typeOf rh) op rh
-    check (Conversion tp r) = do
+    check (Conversion () tp r) = do
       rh <- check r
       tTp <- rawType $ tp
       trh <- rawType $ typeOf rh
       alTp <- alias tp
       let prims = [TInteger, TFloat, TBool, TRune]
       when (not (elem tTp prims || elem trh prims)) $ throwError $ InvalidCast tp (typeOf rh)
-      return $ Conversion alTp rh
+      return $ Conversion alTp tp rh
     check (Selector () l i) = do
       lh <- check l
       rawLh <- rawType $ typeOf lh
@@ -261,7 +262,7 @@ module MGC.Type where
         (t, Name _ n) -> if not (isAlias t || isPrim t) 
           then  throwError $  InvalidFuncCall
           else if length args == 1
-          then check (Conversion (TypeName n) (head args))
+          then check (Conversion () (TypeName n) (head args))
           else throwError $ TypeError "Too many args for conversion"
         (_,_) -> throwError $ InvalidFuncCall
       
@@ -282,14 +283,25 @@ module MGC.Type where
   typecheck :: Checkable a => (a ()) -> (Either TypeError (a Ann), (String, Counters, Env))
   typecheck = runCheck "" [] . check
 
-  addVar :: Identifier -> Type -> (String, Counters, Env) -> (String, Counters, Env)
-  addVar i t (l, tp, x:xs) = (l, tp, (M.insert i t x):xs)
-  addVar i t (l, tp, [])   = (l, tp, [])
+  add f e n t = do
+    exists <- decl n
+    if exists
+    then throwError $ e n
+    else modify (f n t)
 
-  addType :: Identifier -> Type -> (String, Counters, Env) -> (String, Counters, Env)
-  addType i t (l, tp, x:xs) = (l,(tp { typCnt = (typCnt tp) + 1}), (M.insert i (TypeName incTp) (M.insert incTp t x)):xs)
-    where incTp = i++(show $typCnt tp)
-  addType i t (l, tp,   []) = (l, tp, [])
+  addType :: Identifier -> Type -> Check ()
+  addType = add addType' RedeclaredType
+  addVar :: Identifier -> Type -> Check ()
+  addVar  = add addVar'  RedeclaredVar
+
+  addType' :: Identifier -> Type -> (String, Counters, Env) -> (String, Counters, Env)
+  addType' i t (l, tp, x:xs) = (l,(tp { typCnt = (typCnt tp) + 1}), (M.insert i (TypeName incTp) (M.insert incTp t x)):xs)
+    where incTp = i++"$"++(show $typCnt tp)
+  addType' i t (l, tp,   []) = (l, tp, [])
+
+  addVar' :: Identifier -> Type -> (String, Counters, Env) -> (String, Counters, Env)
+  addVar' i t (l, tp, x:xs) = (l, tp, (M.insert i t x):xs)
+  addVar' i t (l, tp, [])   = (l, tp, [])
 
   assign :: (Expression Ann) -> (Expression Ann) -> Check Bool
   assign a b = do
@@ -332,7 +344,7 @@ module MGC.Type where
   typeOf (Rune _)           = TRune
   typeOf (Bool _)           = TBool
   typeOf (Selector t _ _)   = t
-  typeOf (Conversion t _)   = t
+  typeOf (Conversion t _ _) = t
   typeOf (BinaryOp t _ _ _) = t
   typeOf (UnaryOp t _ _)    = t
   typeOf (Index t _ _)      = t

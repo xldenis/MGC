@@ -226,7 +226,7 @@ module MGC.Syntax.Pretty where
 
     pretty (BinaryOp t op lhs rhs) = (pretty lhs) <+> (pretty op) <+> (pretty rhs) <+> (annotate t)
     pretty (UnaryOp t op exp) = (pretty op) <> (pretty exp)  <+> (annotate t)
-    pretty (Conversion tp exp) = (pretty tp) <> (parens $ pretty exp) <+> (annotate tp)
+    pretty (Conversion t tp exp) = (pretty tp) <> (parens $ pretty exp) <+> (annotate t)
     pretty (Selector t exp ident) = (pretty exp) <> (char '.') <> (text ident) <+> (annotate t)
     pretty (Index t exp ind)  = (pretty exp) <> (brackets $ pretty ind) <+> (annotate t)
     pretty (SimpleSlice t sliced lower upper) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper))

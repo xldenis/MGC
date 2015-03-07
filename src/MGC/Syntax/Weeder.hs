@@ -119,7 +119,7 @@ module MGC.Syntax.Weeder where
     weed st (Name a n)            = (Name a) <$> blankString n
     weed st (BinaryOp a o l r)    = liftM2 (BinaryOp a o) (weed st l) (weed st r)
     weed st (UnaryOp a o e)       = liftM  (UnaryOp a o) (weed st e)
-    weed st (Conversion tp e)     = liftM2 (Conversion) (weed st tp) (weed st e)
+    weed st (Conversion a tp e)   = liftM2 (Conversion a) (weed st tp) (weed st e)
     weed st (SimpleSlice a s l r) = liftM3 (SimpleSlice a) (weed st s) (weed st l) (weed st r)
     weed st (FullSlice a s l d r) = liftM4 (FullSlice a) (weed st s) (weed st l) (weed st d) (weed st r)
     weed st (Arguments a e arg)     = liftM2 (Arguments a) (weed st e) (weed st arg)

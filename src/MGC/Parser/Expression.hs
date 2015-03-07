@@ -64,7 +64,7 @@ module MGC.Parser.Expression  where
   name = (Name () <$> identifier) <|> (QualName <$> identifier <*> identifier)
 
   conversion :: Parser (Expression ())
-  conversion = try $ Conversion <$>  builtins <*> (parens $ expression <* (optional $ lexeme "," ))
+  conversion = try $ Conversion () <$>  builtins <*> (parens $ expression <* (optional $ lexeme "," ))
 
   selector :: (Expression ()) -> Parser (Expression ())
   selector e = try $ do{lexeme' "."; i <- identifier;  return $ Selector () e i}
