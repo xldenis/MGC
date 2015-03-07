@@ -7,6 +7,6 @@ func x() {
     type b float64
     var y b = b(1.0)
     x += a(1)
-    y = y + b(1.0) 
+    y = y + y
   }
 }

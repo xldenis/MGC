@@ -74,7 +74,8 @@ module MGC.Syntax where
     | Function Signature
     | Interface [MethodSpec] 
     | ReturnType [Type]
-    | Slice Type 
+    | Slice Type
+    | Alias Type Int
     | TInteger
     | TFloat
     | TString
