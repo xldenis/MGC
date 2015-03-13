@@ -5,7 +5,7 @@ Xavier Denis
 
 To build this project run the command 
   cabal sandbox init
-  cabal install --upgrade-dependencies --constraint="template-haskell installed" --dependencies-only --enable-tests
+  cabal install --upgrade-dependencies --constraint="template-haskell installed" --dependencies-only
   cabal build
 
 This will build the binary in `dist/mgc/mgc`
