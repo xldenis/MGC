@@ -26,13 +26,17 @@ library
     MGC.Syntax.Pretty
     MGC.Syntax.Weeder
     MGC.Check
+    MGC.Codegen
+    MGC.Emit
     MGC
 
   build-depends:       base >=4 && <4.8,
                        parsec >= 3.0,
                        pretty >= 1,
                        containers,
-                       mtl >= 2.2
+                       mtl >= 2.2,
+                       llvm-general >= 3.4.5.0,
+                       llvm-general-pure
 
   hs-source-dirs:      src
   default-language:    Haskell2010
