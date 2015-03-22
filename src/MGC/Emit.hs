@@ -136,7 +136,7 @@ codegenExpr (Name tp id) = do
 --RawString String
 
 binFunc :: BinOp -> Type -> AST.Operand -> AST.Operand -> Codegen AST.Operand
---binFunc BitAnd = band
+binFunc BitAnd _ = band
 --binFunc BitClear = bclear
 binFunc BitOr  _ = bor
 binFunc BitXor _ = xor
@@ -147,8 +147,8 @@ binFunc Minus t = sub t
 binFunc Mod   _ = mod
 binFunc Eq    t = eq t
 binFunc NEq   t = neq t
---binFunc And = and
---binFunc Or = or
+binFunc And   _ = band
+binFunc Or    _ = bor
 binFunc RShift _ = shl
 binFunc LShift _ = shr
   

@@ -22,6 +22,8 @@ module MGC.Codegen where
 
   import qualified MGC.Syntax as S
 
+  import MGC.Parser.Quote
+
   data CodegenState
     = CodegenState {
       currentBlock :: Name                     -- Name of the active block to append to
