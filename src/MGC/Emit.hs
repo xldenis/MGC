@@ -54,7 +54,6 @@ codegenStmt (If s cnd l r) = do
   codegenStmt s
   cond <- codegenExpr cnd
   cbr cond ifthen ifelse
-
   setBlock ifthen
   codegenStmt l
   br ifexit
@@ -88,7 +87,7 @@ codegenStmt (For cond body) = do
   setBlock loopend
 
   return ()
-
+codegenStmt (VarDecl specs) = mapM codegenSpec specs >> return ()
 -- Break
 -- Continue
 -- Assignment BinOp [Expression a] [Expression a]
@@ -103,7 +102,15 @@ codegenCond :: Maybe (ForCond Ann) -> Codegen AST.Operand
 codegenCond (Just (Condition exp)) = codegenExpr exp
 codegenCond Nothing = return true
 --codegenCond (ForClause stmt pre cnd post) = do -- deal w stmt (cant be rerun) same w pre
-  
+
+codegenSpec :: VarSpec Ann -> Codegen ()
+codegenSpec (VarSpec idens exps tp) = do
+  mapM (\(n, e) -> do
+    let tp = (lltype $ typeOf e)
+    i   <- alloca tp
+    val <- codegenExpr e
+    store tp i val
+    assign (AST.Name n) i) (zip idens exps) >> return ()
 
 codegenExpr :: Expression Ann -> Codegen AST.Operand
 codegenExpr (BinaryOp tp op a b) = do
