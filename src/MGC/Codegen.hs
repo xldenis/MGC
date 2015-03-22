@@ -182,7 +182,9 @@ module MGC.Codegen where
   terminator :: Named Terminator -> Codegen (Named Terminator)
   terminator trm = do
     blk <- current
-    modifyBlock $ blk { term = Just trm }
+    case term blk of 
+      Just _  -> return ()
+      Nothing -> modifyBlock $ blk { term = Just trm }
     return trm
 
   -- Side Effects
@@ -230,8 +232,8 @@ module MGC.Codegen where
   one = cons  $ C.Int  64 1
   zero = cons $ C.Int 64 0
 
-  false = zero
-  true = one
+  false = cons $ C.Int 1 0
+  true  = cons $ C.Int 1 1
 
   -- Instructions
 

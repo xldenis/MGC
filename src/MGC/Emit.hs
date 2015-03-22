@@ -53,8 +53,7 @@ codegenStmt (If s cnd l r) = do
   ifexit <- addBlock "if.exit"
   codegenStmt s
   cond <- codegenExpr cnd
-  test <- icmp IP.NE false cond
-  cbr test ifthen ifelse
+  cbr cond ifthen ifelse
 
   setBlock ifthen
   codegenStmt l
@@ -65,16 +64,31 @@ codegenStmt (If s cnd l r) = do
   br ifexit
   ifelse <- getBlock
   setBlock ifexit
-  codegenStmt (Return [BinaryOp TInteger Plus (Integer 1) (Integer 1)])
   return ()
 codegenStmt (Empty) = return ()
 codegenStmt (Inc e) = codegenExpr (BinaryOp (typeOf e) Plus  (Integer 1) e) >> return ()
 codegenStmt (Dec e) = codegenExpr (BinaryOp (typeOf e) Minus (Integer 1) e) >> return ()
 codegenStmt (Block s) = do
-  b <- addBlock ""
-  setBlock b
   mapM codegenStmt s
   return ()
+codegenStmt (For cond body) = do
+  loopstart <- addBlock "for.start"
+  loopbody <- addBlock "for.body"
+  loopend <- addBlock "for.end"
+  -- init vars
+  br loopstart
+  setBlock loopstart
+  test <- codegenCond cond
+  cbr test loopbody loopend
+
+  setBlock loopbody
+  codegenStmt body
+  br loopstart
+
+  setBlock loopend
+
+  return ()
+
 -- Break
 -- Continue
 -- Assignment BinOp [Expression a] [Expression a]
@@ -85,11 +99,17 @@ codegenStmt (Block s) = do
 -- TypeDecl [TypeSpec]
 -- VarDecl [VarSpec a] 
 
+codegenCond :: Maybe (ForCond Ann) -> Codegen AST.Operand
+codegenCond (Just (Condition exp)) = codegenExpr exp
+codegenCond Nothing = return true
+--codegenCond (ForClause stmt pre cnd post) = do -- deal w stmt (cant be rerun) same w pre
+  
+
 codegenExpr :: Expression Ann -> Codegen AST.Operand
 codegenExpr (BinaryOp tp op a b) = do
   a' <- codegenExpr a
   b' <- codegenExpr b
-  binFunc op tp a' b'
+  binFunc op (typeOf a) a' b'
 codegenExpr (UnaryOp tp op a) = do
   a' <- codegenExpr a
   unOp op tp a'
@@ -120,16 +140,14 @@ binFunc :: BinOp -> Type -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 --binFunc BitClear = bclear
 binFunc BitOr  _ = bor
 binFunc BitXor _ = xor
-
 binFunc Div   t = div t
 binFunc Mult  t = mul t
 binFunc Plus  t = add t
 binFunc Minus t = sub t
 binFunc Mod   _ = mod
-
-binFunc Eq  t = eq t
+binFunc Eq    t = eq t
+binFunc NEq   t = neq t
 --binFunc And = and
-binFunc NEq t = neq t
 --binFunc Or = or
 binFunc RShift _ = shl
 binFunc LShift _ = shr
