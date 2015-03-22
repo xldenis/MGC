@@ -1,21 +1,23 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module MGC.Syntax where
+  import Data.Data
 
   type Identifier = String
   data QualIdent = QualIdent String String
 
-  data Package a = Package Identifier [TopLevelDeclaration a] deriving (Show, Eq)
+  data Package a = Package Identifier [TopLevelDeclaration a] deriving (Show, Eq, Typeable, Data)
 
   data TopLevelDeclaration a
     = FunctionDecl Identifier Signature (Statement a)
-    | Decl (Statement a) deriving (Show, Eq)
+    | Decl (Statement a) deriving (Show, Eq, Typeable, Data)
 
-  data Signature = Signature [Parameter]  [Parameter] deriving (Show, Eq)
+  data Signature = Signature [Parameter]  [Parameter] deriving (Show, Eq, Typeable, Data)
 
-  data Parameter = Parameter [Identifier] Type deriving (Show, Eq)
+  data Parameter = Parameter [Identifier] Type deriving (Show, Eq, Typeable, Data)
 
-  data TypeSpec  = TypeSpec Identifier Type deriving (Show, Eq)
+  data TypeSpec  = TypeSpec Identifier Type deriving (Show, Eq, Typeable, Data)
 
-  data VarSpec a = VarSpec [Identifier] [Expression a] (Maybe Type)  deriving (Show, Eq)
+  data VarSpec a = VarSpec [Identifier] [Expression a] (Maybe Type)  deriving (Show, Eq, Typeable, Data)
 
   data Expression a
    = BinaryOp a BinOp (Expression a) (Expression a)
@@ -33,15 +35,15 @@ module MGC.Syntax where
    | Float Float
    | IntString String 
    | Bool Bool
-   | RawString String deriving (Show, Eq)
+   | RawString String deriving (Show, Eq, Typeable, Data)
 
   data BinOp 
     = Or | And 
     | Eq | NEq | LessThan | LessThanEq | GreaterThan | GreaterThanEq
     | Plus | Minus | BitOr | BitXor
-    | Mult | Div | Mod | LShift | RShift | BitAnd | BitClear  deriving (Show, Eq)
+    | Mult | Div | Mod | LShift | RShift | BitAnd | BitClear  deriving (Show, Eq, Typeable, Data)
 
-  data UOp = Pos | Neg | Not | BComp  deriving (Show, Eq)
+  data UOp = Pos | Neg | Not | BComp  deriving (Show, Eq, Typeable, Data)
 
   data Statement a
     = Return [Expression a]
@@ -59,13 +61,13 @@ module MGC.Syntax where
     | ShortDecl [Identifier] [Expression a]
     | Switch (Statement a) (Maybe (Expression a)) [SwitchClause a]
     | TypeDecl [TypeSpec]
-    | VarDecl [VarSpec a] deriving (Show, Eq)
+    | VarDecl [VarSpec a] deriving (Show, Eq, Typeable, Data)
 
-  data ForCond a = Condition (Expression a) | ForClause (Statement a) (Maybe (Expression a)) (Statement a)  deriving (Show, Eq)
+  data ForCond a = Condition (Expression a) | ForClause (Statement a) (Maybe (Expression a)) (Statement a)  deriving (Show, Eq, Typeable, Data)
 
   data SwitchClause a
     = Default [Statement a]
-    | Case [Expression a] [Statement a] deriving (Show, Eq)
+    | Case [Expression a] [Statement a] deriving (Show, Eq, Typeable, Data)
   
   data Type
     = TypeName Identifier 
@@ -80,14 +82,14 @@ module MGC.Syntax where
     | TString
     | TRune
     | TNil
-    | TBool deriving (Show, Eq)
+    | TBool deriving (Show, Eq, Typeable, Data)
 
   data FieldDecl  
     = NamedField [Identifier] Type (Maybe String) 
-    | AnonField Type (Maybe String) deriving (Show, Eq)
+    | AnonField Type (Maybe String) deriving (Show, Eq, Typeable, Data)
   data MethodSpec 
     = MethodSpec Identifier Signature 
-    | InterfaceName Identifier  deriving (Show, Eq)
+    | InterfaceName Identifier  deriving (Show, Eq, Typeable, Data)
 
   isMulOp :: BinOp -> Bool
   isMulOp Mult      = True

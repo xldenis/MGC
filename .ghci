@@ -1,1 +1,3 @@
 :m + MGC.Parser MGC.Emit MGC.Codegen
+:set +m
+:set -XQuasiQuotes

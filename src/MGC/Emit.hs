@@ -122,6 +122,7 @@ codegenExpr (UnaryOp tp op a) = do
   unOp op tp a'
 codegenExpr (Integer i) = return $ cons $ C.Int 64 (toInteger i)
 codegenExpr (Float f) = return $ cons $ C.Float (F.Single f)
+codegenExpr (Bool b) = return $ cons $ C.Int 1 (toInteger $ fromEnum b)
 --codegenExpr (Arguments _ fn args) = do
 --  largs <- mapM codegenExpr args
 --  call (externf (AST.Name fn) largs)
@@ -135,7 +136,6 @@ codegenExpr (Name tp id) = do
 --SimpleSlice a (Expression a) (Expression a) (Expression a)
 --FullSlice a (Expression a) (Expression a) (Expression a) (Expression a)
 --Arguments a (Expression a) [(Expression a)]
---Name a Identifier
 --QualName Identifier Identifier
 --Rune String
 --IntString String 
