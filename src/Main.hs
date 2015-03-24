@@ -46,14 +46,14 @@ compile fname args = do
     Right ast -> case runWeeder ast of 
       Left err -> putStrLn $ show err
       Right ast -> do
-        if astPrint args
-        then putStrLn $ show ast
-        else return ()
         case (typecheck ast) of
           (Left err, (l,_,_)) -> do
             putStrLn $ show err ++ "\n" ++  l
             if (dumpsymtab args) then saveFile fname "symtab" l else return ()
           (Right typedAst, (l,_,_)) -> do
+            if astPrint args
+            then putStrLn $ show typedAst
+            else return ()
             putStrLn l
             putStrLn $ prettyShow $ pretty typedAst
             if (dumpsymtab args) then saveFile fname "symtab" l else return ()

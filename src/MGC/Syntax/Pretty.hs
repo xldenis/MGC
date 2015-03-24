@@ -126,7 +126,7 @@ module MGC.Syntax.Pretty where
   prettyShow' n (HUnion ind s) = (prettyShow' (ind+n) (head s)) ++ (concatMap (prettyShow' 0) (tail s))
   prettyShow' _ EmptyDoc = ""
 
-  instance Pretty Ann where pretty = pretty . ty
+  instance Pretty Ann where pretty a = (pretty $ ty a) <+> (parens $ pretty (truety a))
 
   instance Pretty a => Pretty (Package a) where
     pretty (Package name content) = text "package" <+> text name <+> text "\n\n" <> (pretty content)
@@ -220,8 +220,7 @@ module MGC.Syntax.Pretty where
       Nothing -> empty
       Just a -> text a)
 
-  instance Pretty MethodSpec where
-    pretty _ = empty
+  instance Pretty MethodSpec where pretty _ = empty
 
   instance Pretty a => Pretty (Expression a) where
     prettyList exps = foldl (<>) empty $ intersperse (text ", ") $ map pretty exps
@@ -244,7 +243,5 @@ module MGC.Syntax.Pretty where
     pretty (Arguments _ expr args) = (pretty expr) <> (parens $ pretty args)
 
   instance Pretty () where pretty () = empty
-  instance Pretty BinOp where
-    pretty op = text (fst.head $ filter (\(el) -> (snd el) == op) binaryOps)
-  instance Pretty UOp where
-    pretty op = text (fst.head $ filter (\el -> (snd el) == op) unaryOps)
+  instance Pretty BinOp where pretty op = text (fst.head $ filter (\(el) -> (snd el) == op) binaryOps)
+  instance Pretty UOp where pretty op = text (fst.head $ filter (\el -> (snd el) == op) unaryOps)

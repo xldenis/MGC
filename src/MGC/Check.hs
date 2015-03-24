@@ -183,7 +183,7 @@ module MGC.Check where
   instance Checkable VarSpec where
     check (VarSpec idens exps Nothing) = do -- dont ignore tp check double declarations
       tps <- checkList exps
-      mapM (\(i, t) ->addVar i (typeOf t) ) $ zip idens tps
+      mapM (\(i, t) -> addVar i (typeOf t) ) $ zip idens tps
       return $ VarSpec idens tps Nothing
     check (VarSpec idens exps (Just t)) = do
       tps <- checkList exps
@@ -191,7 +191,6 @@ module MGC.Check where
       when (any ((trueT /=).typeOf ) tps) $ throwError $ InvalidVarDec t tps
       mapM (\i -> addVar i trueT ) idens
       return $ VarSpec idens tps (Just t)
-
 
   instance Checkable (SwitchClause) where
     check (Default stmts) = Default <$> (checkList stmts)
@@ -225,9 +224,10 @@ module MGC.Check where
       tTp <- rawType $ tp
       trh <- rawType $ typeOf rh
       alTp <- alias tp
+      let a = Ann{ty = alTp, truety = tTp}
       let prims = [TInteger, TFloat, TBool, TRune]
       when (not (elem tTp prims || elem trh prims)) $ throwError $ InvalidCast tp (typeOf rh)
-      return $ Conversion (ann alTp) tp rh
+      return $ Conversion a tp rh
     check (Selector () l i) = do
       lh <- check l
       rawLh <- rawType $ typeOf lh
