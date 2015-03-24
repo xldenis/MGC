@@ -4,7 +4,7 @@ import Prelude hiding (mod, div, not)
 
 
 import MGC.Syntax as S
-import MGC.Check (Ann, typeOf)
+import MGC.Check (Ann(..), typeOf, annOf)
 import MGC.Codegen
 
 import LLVM.General.Context
@@ -65,8 +65,8 @@ codegenStmt (If s cnd l r) = do
   setBlock ifexit
   return ()
 codegenStmt (Empty) = return ()
-codegenStmt (Inc e) = codegenExpr (BinaryOp (typeOf e) Plus  (Integer 1) e) >> return ()
-codegenStmt (Dec e) = codegenExpr (BinaryOp (typeOf e) Minus (Integer 1) e) >> return ()
+codegenStmt (Inc e) = codegenExpr (BinaryOp (annOf e) Plus  (Integer 1) e) >> return ()
+codegenStmt (Dec e) = codegenExpr (BinaryOp (annOf e) Minus (Integer 1) e) >> return ()
 codegenStmt (Block s) = do
   mapM codegenStmt s
   return ()
@@ -88,12 +88,19 @@ codegenStmt (For cond body) = do
 
   return ()
 codegenStmt (VarDecl specs) = mapM codegenSpec specs >> return ()
+codegenStmt (ShortDecl idens exps) = do
+  mapM (\(n, e) -> do
+    let tp = lltype $ typeOf e
+    i <- alloca tp
+    val <- codegenExpr e
+    store tp i val
+    assign (AST.Name n) i) (zip idens exps) >> return ()
+--codegenStmt (TypeDecl specs) = mapM codegenType specs >> return ()
 -- Break
--- Continue
+-- Continue -- need to keep track of loops 
 -- Assignment BinOp [Expression a] [Expression a]
--- Fallthrough
--- For (Maybe (ForCond a)) (Statement a)
--- ShortDecl [Identifier] [Expression a]
+-- Fallthrough -- need to keep track of switches
+-- For (Maybe (ForCond a)) (Statement a) -- need to implement clause looops
 -- Switch (Statement a) (Maybe (Expression a)) [SwitchClause a]
 -- TypeDecl [TypeSpec]
 -- VarDecl [VarSpec a] 
@@ -102,6 +109,10 @@ codegenCond :: Maybe (ForCond Ann) -> Codegen AST.Operand
 codegenCond (Just (Condition exp)) = codegenExpr exp
 codegenCond Nothing = return true
 --codegenCond (ForClause stmt pre cnd post) = do -- deal w stmt (cant be rerun) same w pre
+
+--codgenType :: TypeSpec -> Codegen ()
+--codegenType (TypeSpec id tp) = do
+
 
 codegenSpec :: VarSpec Ann -> Codegen ()
 codegenSpec (VarSpec idens exps tp) = do
@@ -119,7 +130,7 @@ codegenExpr (BinaryOp tp op a b) = do
   binFunc op (typeOf a) a' b'
 codegenExpr (UnaryOp tp op a) = do
   a' <- codegenExpr a
-  unOp op tp a'
+  unOp op (ty tp) a'
 codegenExpr (Integer i) = return $ cons $ C.Int 64 (toInteger i)
 codegenExpr (Float f) = return $ cons $ C.Float (F.Single f)
 codegenExpr (Bool b) = return $ cons $ C.Int 1 (toInteger $ fromEnum b)
@@ -129,7 +140,7 @@ codegenExpr (Bool b) = return $ cons $ C.Int 1 (toInteger $ fromEnum b)
 --codegenExpr ()
 codegenExpr (Name tp id) = do
   op <- getvar (AST.Name id)
-  load (lltype tp) op -- NEED TO IMPLEMENT NAME TABLE
+  load (lltype $ ty tp) op -- NEED TO IMPLEMENT NAME TABLE
 --Conversion a Type (Expression a)
 --Selector a (Expression a) Identifier
 --Index a (Expression a) (Expression a)

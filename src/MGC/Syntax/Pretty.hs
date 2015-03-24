@@ -3,7 +3,7 @@
 module MGC.Syntax.Pretty where
   --import Text.PrettyPrint.HughesPJClass
   import MGC.Syntax
-
+  import MGC.Check (Ann(..))
   import Data.List (intercalate, intersperse)
 
   import MGC.Parser.Expression (binaryOps, unaryOps)
@@ -125,6 +125,8 @@ module MGC.Syntax.Pretty where
   prettyShow' n (Doc ind stmt) = (replicate (n + ind) ' ')++ stmt
   prettyShow' n (HUnion ind s) = (prettyShow' (ind+n) (head s)) ++ (concatMap (prettyShow' 0) (tail s))
   prettyShow' _ EmptyDoc = ""
+
+  instance Pretty Ann where pretty = pretty . ty
 
   instance Pretty a => Pretty (Package a) where
     pretty (Package name content) = text "package" <+> text name <+> text "\n\n" <> (pretty content)

@@ -28,7 +28,7 @@ module MGC.Codegen where
     = CodegenState {
       currentBlock :: Name                     -- Name of the active block to append to
     , blocks       :: Map.Map Name BlockState  -- Blocks for function
-    , assigned     :: Map.Map Name Operand   -- Assigned var addrs                     
+    , assigned     :: Map.Map Name Operand     -- Assigned var addrs                     
     , blockCount   :: Int                      -- Count of basic blocks
     , count        :: Word                     -- Count of unnamed instructions
     } deriving Show
@@ -180,6 +180,8 @@ module MGC.Codegen where
     let ref = (UnName n)
     modifyBlock $ blk { stack = i ++ [ref := ins] }
     return $ local tp ref
+
+    
 
   terminator :: Named Terminator -> Codegen (Named Terminator)
   terminator trm = do
