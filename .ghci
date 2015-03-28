@@ -1,3 +1,5 @@
-:m + MGC.Parser MGC.Emit MGC.Codegen
+:l MGC.Parser MGC.Emit MGC.Codegen MGC.Parser.Quote
+:m Text.Parsec
 :set +m
 :set -XQuasiQuotes
+:set prompt "ghci> "

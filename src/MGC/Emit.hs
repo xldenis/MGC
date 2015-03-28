@@ -12,10 +12,7 @@ import LLVM.General.Module
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST as AST
-import qualified LLVM.General.AST.IntegerPredicate as IP
-
-
-import Control.Applicative ((<$>), (<*>))
+import LLVM.General.PassManager
 
 import Control.Monad
 import Control.Monad.Except
@@ -95,6 +92,17 @@ codegenStmt (ShortDecl idens exps) = do
     val <- codegenExpr e
     store tp i val
     assign (AST.Name n) i) (zip idens exps) >> return ()
+codegenStmt (Assignment Eq lh rh) = do
+  lhs <- mapM getaddr lh
+  rhs <- mapM codegenExpr rh
+  let lt = map typeOf lh
+  mapM (\(t,l,r) -> store (lltype $ t) l r) $ zip3 lt lhs rhs
+  return ()
+codegenStmt (Assignment op lh rh) = do
+  addr <- mapM getaddr lh
+  updated <- mapM (\(a,b) -> codegenExpr $ (BinaryOp (annOf a) op a b)) (zip lh rh)
+  mapM (\(t, a, v) -> store (lltype $ t) a v) $ zip3 (map typeOf lh) addr updated
+  return ()
 --codegenStmt (TypeDecl specs) = mapM codegenType specs >> return ()
 -- Break
 -- Continue -- need to keep track of loops 
@@ -103,19 +111,22 @@ codegenStmt (ShortDecl idens exps) = do
 -- For (Maybe (ForCond a)) (Statement a) -- need to implement clause looops
 -- Switch (Statement a) (Maybe (Expression a)) [SwitchClause a]
 -- TypeDecl [TypeSpec]
--- VarDecl [VarSpec a] 
 
 codegenCond :: Maybe (ForCond Ann) -> Codegen AST.Operand
-codegenCond (Just (Condition exp)) = codegenExpr exp
+codegenCond (Just (Condition e)) = codegenExpr e
 codegenCond Nothing = return true
 --codegenCond (ForClause stmt pre cnd post) = do -- deal w stmt (cant be rerun) same w pre
-
 --codgenType :: TypeSpec -> Codegen ()
+
 --codegenType (TypeSpec id tp) = do
 
 
 codegenSpec :: VarSpec Ann -> Codegen ()
-codegenSpec (VarSpec idens exps tp) = do
+codegenSpec (VarSpec idens [] (Just tp)) = do
+  mapM (\n -> do
+    i <- alloca $ lltype tp
+    assign (AST.Name n) i) idens >> return ()
+codegenSpec (VarSpec idens exps _) = do
   mapM (\(n, e) -> do
     let tp = (lltype $ typeOf e)
     i   <- alloca tp
@@ -134,9 +145,11 @@ codegenExpr (UnaryOp tp op a) = do
 codegenExpr (Integer i) = return $ cons $ C.Int 64 (toInteger i)
 codegenExpr (Float f) = return $ cons $ C.Float (F.Single f)
 codegenExpr (Bool b) = return $ cons $ C.Int 1 (toInteger $ fromEnum b)
---codegenExpr (Arguments _ fn args) = do
---  largs <- mapM codegenExpr args
---  call (externf (AST.Name fn) largs)
+codegenExpr (Arguments tp fn args) = do
+  largs <- mapM codegenExpr args
+  let fnN = case fn of 
+              Name _ n -> n
+  call (lltype $ ty tp) (externf (lltype $ ty tp) (AST.Name fnN)) largs
 --codegenExpr ()
 codegenExpr (Name tp id) = do
   op <- getvar (AST.Name id)
@@ -185,5 +198,7 @@ unOp BComp _ o = bcomp o
 testCode mod = do
   withContext $ \ctxt ->
     runExceptT $ withModuleFromAST ctxt mod $ \m -> do
-      s <- moduleLLVMAssembly m
-      putStrLn s
+      withPassManager defaultCuratedPassSetSpec {optLevel = Just 3} $ \pm -> do
+        runPassManager pm m
+        s <- moduleLLVMAssembly m
+        putStrLn s

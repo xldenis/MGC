@@ -3,7 +3,7 @@ module MGC.Expectation where
   import Text.Parsec.String
   import Text.Parsec
   import MGC.Syntax (Type(..), Expression(..))
-  import MGC.Check (typeOf)
+  import MGC.Check (typeOf, Ann)
   import Control.Monad (unless)
 
   parses :: Parser a -> String -> Either ParseError a
@@ -19,7 +19,7 @@ module MGC.Expectation where
       Right c -> f c
       Left _ -> expectationFailure $ "operation failed"
 
-  hastype :: Type -> Expression Type -> Expectation
+  hastype :: Type -> Expression Ann -> Expectation
   hastype t e = unless (typeOf e == t) $ expectationFailure  $ "got "++show (typeOf e)++" expected "++show t
 
   --(/~>) :: (Show b, Eq b, Show a) => Either b a -> b -> Expectation

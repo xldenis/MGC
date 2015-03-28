@@ -66,8 +66,8 @@ module MGC.Syntax.Pretty where
   (HUnion in1 s) <+> c = HUnion in1 $ s ++ [char ' ', c]
 
   (<?>) :: Doc -> Doc -> Doc
-  a <?> EmptyDoc = empty
-  EmptyDoc <?> a = empty
+  _ <?> EmptyDoc = empty
+  EmptyDoc <?> _ = empty
   a <?> b = a <+> b
 
   ($$) :: Doc -> Doc -> Doc
@@ -210,6 +210,7 @@ module MGC.Syntax.Pretty where
     pretty TRune = text "rune"
     pretty TBool = text "bool"
     pretty TNil = empty
+    pretty (ReturnType _) = empty -- not a user facing type
 
   instance Pretty FieldDecl where
     pretty (NamedField nm tp t) = (foldl (<>) empty $ intersperse (text ", ") $ map text nm) <+> (pretty tp) <+> (
@@ -230,8 +231,8 @@ module MGC.Syntax.Pretty where
     pretty (Conversion t tp exp) = (pretty tp) <> (parens $ pretty exp) <+> (annotate t)
     pretty (Selector t exp ident) = (pretty exp) <> (char '.') <> (text ident) <+> (annotate t)
     pretty (Index t exp ind)  = (pretty exp) <> (brackets $ pretty ind) <+> (annotate t)
-    pretty (SimpleSlice t sliced lower upper) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper))
-    pretty (FullSlice t sliced lower upper dir) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper) <> (char ':') <> (pretty dir))
+    pretty (SimpleSlice _ sliced lower upper) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper))
+    pretty (FullSlice _ sliced lower upper dir) = (pretty sliced) <> (brackets $ (pretty lower) <> (char ':') <> (pretty upper) <> (char ':') <> (pretty dir))
     pretty (Name t ident) = text ident <+> (annotate t)
     pretty (QualName pkg ident) = (text pkg) <> (char '.') <> (text ident)
     pretty (Integer val) = int val

@@ -5,7 +5,7 @@ module MGC.Parser.Prim where
   
   import Numeric
   import Control.Applicative ((<*), (*>), (<$>), (<*>))
-  import Control.Monad (liftM, liftM2, (>>))
+  import Control.Monad (liftM)
   import MGC.Syntax
 
   reservedWords = [ 

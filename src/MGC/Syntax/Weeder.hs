@@ -2,7 +2,6 @@
 module MGC.Syntax.Weeder where
   import MGC.Syntax
   import Control.Applicative ((<$>), (<*>), (<*))
-  import Control.Monad (liftM, liftM2, liftM3, liftM4, mapM)
   import Control.Monad.Except
   import Control.Monad.State
 

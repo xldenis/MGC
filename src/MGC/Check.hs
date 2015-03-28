@@ -9,7 +9,7 @@ module MGC.Check where
   import Data.Maybe (listToMaybe, mapMaybe)
   import Control.Monad.State
   import Control.Monad.Except
-  import Control.Applicative ((<$>), (<*>), (<*))
+  import Control.Applicative ((<$>), (<*>))
 
   data TypeError 
     = TypeError String
@@ -86,8 +86,18 @@ module MGC.Check where
     check (Return exps) = do
       (_, tp, _) <- get
       e <- checkList exps
+
+      tps <- mapM (\x -> case typeOf x of
+        ReturnType t -> case length t of
+          0 -> throwError InvalidReturn
+          1 -> return t
+          l -> if l == length e 
+            then return t 
+            else throwError $ InvalidReturn
+        a -> return [a]) e
+
       case (ret tp) of
-        ReturnType t -> when (t /= (map typeOf e)) $ throwError $ InvalidReturn 
+        ReturnType t -> when (t /= (concat tps)) $ throwError $ InvalidReturn
         TNil -> when (length e /= 0) $ throwError $ InvalidReturn
         _ -> throwError $ ImpossibleError "got non return type as function return"
       return $ Return e
@@ -286,6 +296,9 @@ module MGC.Check where
     check (RawString s) = return $ RawString s
     check (Rune r) = return $ Rune r
     check (Bool b) = return $ Bool b
+    check (SimpleSlice _ _ _ _) = throwError $ ImpossibleError "Not Supported"
+    check (FullSlice _ _ _ _ _) = throwError $ ImpossibleError "Not Supported"
+    check (QualName _ _) = throwError $ ImpossibleError "Not Supported"
 
   funcTypes :: [Parameter] -> [Type]
   funcTypes = concat . map (\(Parameter idens typ) -> replicate (if (length idens) == 0 then 1 else (length idens)) typ)
@@ -314,11 +327,11 @@ module MGC.Check where
     where incNm = i++"$"++(show $ typCnt tp)
           incTp = TypeName incNm
           newX  = (M.insert i (Ann{ ty = incTp, truety = ty t}) (M.insert incNm t x))
-  addType' i t (l, tp,   []) = (l, tp, [])
+  addType' _ _ (l, tp,   []) = (l, tp, [])
 
   addVar' :: Identifier -> Ann -> (String, Counters, Env) -> (String, Counters, Env)
   addVar' i t (l, tp, x:xs) = (l, tp, (M.insert i t x):xs)
-  addVar' i t (l, tp, [])   = (l, tp, [])
+  addVar' _ _ (l, tp, [])   = (l, tp, [])
 
   assign :: (Expression Ann) -> (Expression Ann) -> Check Bool
   assign a b = do
@@ -367,6 +380,9 @@ module MGC.Check where
   typeOf (Index a _ _)      = ty a
   typeOf (Arguments a _ _)  = ty a
   typeOf (Name a _)         = ty a
+  typeOf (SimpleSlice a _ _ _) = ty a
+  typeOf (FullSlice a _ _ _ _) = ty a
+  typeOf (QualName _ _) = TInteger
 
   annOf :: (Expression Ann) -> Ann
   annOf (Integer _)        = ann TInteger
@@ -382,6 +398,9 @@ module MGC.Check where
   annOf (Index a _ _)      = a
   annOf (Arguments a _ _)  = a
   annOf (Name a _)         = a
+  annOf (SimpleSlice a _ _ _) = a
+  annOf (FullSlice a _ _ _ _) = a
+  annOf (QualName _ _) = ann TInteger
 
   field :: Type -> Identifier -> (Maybe Type)
   field (Struct decs) ident = listToMaybe $ mapMaybe (\x -> case x of 

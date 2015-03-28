@@ -6,7 +6,7 @@ module MGC.Parser.Expression  where
   import {-# SOURCE #-} MGC.Parser.Type
 
   import Control.Applicative ((<$>), (<*), (*>), (<*>))
-  import Control.Monad ((>>), liftM2, liftM)
+  import Control.Monad (liftM)
 
   import MGC.Syntax
   import MGC.Parser.Prim

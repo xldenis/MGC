@@ -10,7 +10,6 @@ module MGC.Parser where
   import Text.Parsec.Char
   import Text.Parsec.Combinator
   import Control.Applicative ((<$>), (<*>), (<*), (*>), (<|>))
-  import Control.Monad ((>>))
 
   mulOpParser = do
     op <- many1 (oneOf $  concat (map (fst) mulOps))

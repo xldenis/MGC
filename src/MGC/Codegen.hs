@@ -11,7 +11,6 @@ module MGC.Codegen where
 
   import LLVM.General.AST
   import LLVM.General.AST.Global
-  import LLVM.General.AST.Operand
 
   import qualified LLVM.General.AST.CallingConvention as CC
   import qualified LLVM.General.AST.Constant as C
@@ -21,8 +20,7 @@ module MGC.Codegen where
   import qualified LLVM.General.AST.Type as T
 
   import qualified MGC.Syntax as S
-
-  import MGC.Parser.Quote
+  import qualified MGC.Check  as CK
 
   data CodegenState
     = CodegenState {
@@ -99,6 +97,9 @@ module MGC.Codegen where
     case Map.lookup v lcls of
       Just x -> return x
       Nothing -> error $ "not possible" -- refactor
+
+  getaddr :: S.Expression CK.Ann -> Codegen Operand
+  getaddr (S.Name t x) = getvar (Name x) 
 
   entry :: Codegen Name
   entry = gets currentBlock
@@ -181,8 +182,6 @@ module MGC.Codegen where
     modifyBlock $ blk { stack = i ++ [ref := ins] }
     return $ local tp ref
 
-    
-
   terminator :: Named Terminator -> Codegen (Named Terminator)
   terminator trm = do
     blk <- current
@@ -227,6 +226,7 @@ module MGC.Codegen where
     [] -> T.void
     _  -> lltype (head tps)
 
+  decType :: S.FieldDecl -> S.Type
   decType (S.AnonField    tp _) = tp
   decType (S.NamedField _ tp _) = tp
 
@@ -257,21 +257,25 @@ module MGC.Codegen where
   add tp a b = case tp of
     S.TInteger -> instr int $ Add False False a b []
     S.TFloat   -> instr double $ FAdd NoFastMathFlags a b []
+    _ -> error $ "impossible"
 
   sub :: S.Type -> Operand -> Operand -> Codegen Operand
   sub tp a b = case tp of
     S.TInteger -> instr int $ Sub False False a b []
     S.TFloat   -> instr double $ FSub NoFastMathFlags a b []
+    _ -> error $ "impossible"
 
   mul :: S.Type -> Operand -> Operand -> Codegen Operand
   mul tp a b = case tp of
     S.TInteger -> instr int $ Mul False False a b []
     S.TFloat   -> instr double $ FMul NoFastMathFlags a b []
+    _ -> error $ "impossible"
 
   div :: S.Type -> Operand -> Operand -> Codegen Operand
   div tp a b = case tp of
     S.TInteger -> instr int $ Add False False a b []
     S.TFloat   -> instr double $ FDiv NoFastMathFlags a b []
+    _ -> error $ "impossible"
 
   mod :: Operand -> Operand -> Codegen Operand
   mod a b = instr int $ SRem a b []
@@ -306,26 +310,32 @@ module MGC.Codegen where
   eq :: S.Type -> Operand -> Operand -> Codegen Operand
   eq S.TInteger = icmp IP.EQ 
   eq S.TFloat   = fcmp FP.OEQ
+  eq _          = error $ "impossible"
 
   neq :: S.Type -> Operand -> Operand -> Codegen Operand
   neq S.TInteger = icmp IP.EQ
   neq S.TFloat   = fcmp FP.OEQ
+  neq _          = error $ "impossible"
 
   gt :: S.Type -> Operand -> Operand -> Codegen Operand
   gt S.TInteger = icmp IP.SGT
   gt S.TFloat   = fcmp FP.OGT
+  gt _          = error $ "impossible"
 
   lt :: S.Type -> Operand -> Operand -> Codegen Operand
   lt S.TInteger = icmp IP.SLT
   lt S.TFloat   = fcmp FP.OLT
+  lt _          = error $ "impossible"
 
   geq :: S.Type -> Operand -> Operand -> Codegen Operand
   geq S.TInteger = icmp IP.SGT
   geq S.TFloat   = fcmp FP.OGE
+  geq _          = error $ "impossible"
 
   leq :: S.Type -> Operand -> Operand -> Codegen Operand
   leq S.TInteger = icmp IP.SLE
   leq S.TFloat   = fcmp FP.OLE
+  leq _          = error $ "impossible"
 
   sitofp :: Operand -> Codegen Operand
   sitofp a = instr double $ SIToFP a int []
