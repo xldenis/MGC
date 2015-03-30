@@ -31,7 +31,7 @@ module MGC.Parser.Expression  where
   postfix n fun = Postfix (do{op n; return $ UnaryOp () fun;})
 
   opLetter :: [Char]
-  opLetter = "/%*=!<>|&^"
+  opLetter = "/%*=<>|&^"
 
   op :: String -> Parser ()
   op s = try $ do 
@@ -64,7 +64,7 @@ module MGC.Parser.Expression  where
   name = (Name () <$> identifier) <|> (QualName <$> identifier <*> identifier)
 
   conversion :: Parser (Expression ())
-  conversion = try $ Conversion () <$>  builtins <*> (parens $ expression <* (optional $ lexeme "," ))
+  conversion = try $ Conversion () <$>  (builtins <|> (parens builtins)) <*> (parens $ expression <* (optional $ lexeme "," ))
 
   selector :: (Expression ()) -> Parser (Expression ())
   selector e = try $ do{lexeme' "."; i <- identifier;  return $ Selector () e i}
@@ -83,6 +83,6 @@ module MGC.Parser.Expression  where
       Nothing -> return $ (SimpleSlice () e e1 e2)
 
   args :: Parser (Expression ())
-  args = try $ Arguments () <$> (Name () <$> reservedFunc) <*> parens expressionList
+  args = try $ Arguments () <$> (Name () <$> (reservedFunc <|> (parens reservedFunc))) <*> parens expressionList
 
   expressionList = expression `sepEndBy` (lexeme ",")

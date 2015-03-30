@@ -54,7 +54,7 @@ module MGC.Parser.Prim where
 
   fullSpace :: Parser ()
   fullSpace = try $ do
-    many $ lineComment <|> (space >> spaces >> return ()) <|> singleComment <|> fullComment
+    many $ singleComment <|> lineComment <|> (space >> spaces >> return ()) <|> fullComment
     return ()
     
   lineSpace :: Parser ()
@@ -65,7 +65,7 @@ module MGC.Parser.Prim where
   singleComment :: Parser ()
   singleComment = try $ do
     string "//"
-    manyTill anyChar (try $ char '\n')
+    manyTill anyChar (try $ (char '\n' >> return ()) <|> eof)
     return ()
 
   fullComment :: Parser ()
@@ -105,14 +105,14 @@ module MGC.Parser.Prim where
 
   reservedType :: Parser Identifier
   reservedType = try $ do
-    word <- (many1 $ (alphaNum)) <* lineSpace
-    if (elem word reservedWords) && not (elem word reservedTypes)
+    word <- (many1 $ (alphaNum <|> char '_')) <* lineSpace
+    if (elem word reservedWords) -- && not (elem word reservedTypes)
     then fail $ "cannot use reserved word " ++ word ++" as identifier" 
     else return $ word  
 
   reservedFunc :: Parser Identifier
   reservedFunc = try $ do
-    word <- (many1 $ (alphaNum)) <* lineSpace
+    word <- (many1 $ (alphaNum <|> char '_')) <* lineSpace
     if (elem word reservedWords) && not (elem word reservedFuncs  )
     then fail $ "cannot use reserved word " ++ word ++" as identifier" 
     else return $ word  

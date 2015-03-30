@@ -8,7 +8,7 @@ module MGC.Parser.Type  where
   import Control.Applicative ((<$>), (<*>), (<*), (*>))
   
   typeParser :: Parser Type
-  typeParser = (typeLit <|> typeName <|> (parens typeParser)) <* lineSpace <?> "type"
+  typeParser = (typeName <|> typeLit <|> (parens typeParser)) <* lineSpace <?> "type"
 
   typeName :: Parser Type
   typeName = TypeName <$> (try $ reservedType) <?> "builtin type"
@@ -29,7 +29,12 @@ module MGC.Parser.Type  where
   sliceType = try $ string "[]" *> (Slice <$> typeParser)
 
   builtins :: Parser Type
-  builtins = try $ (string "int" *> return TInteger) <|> (string "float64" *> return TFloat) <|> (string "rune" *> return TRune) <|> (string "string" *> return TString) <|> (string "bool" *> return TBool)
+  builtins = try $ (do
+        (try $ lexeme "int" *> return TInteger) 
+    <|> (try $ lexeme "float64" *> return TFloat) 
+    <|> (try $ lexeme "rune" *> return TRune) 
+    <|> (try $ lexeme "string" *> return TString) 
+    <|> (try $ lexeme "bool" *> return TBool))
 
   structType :: Parser Type
   structType = try $ do
