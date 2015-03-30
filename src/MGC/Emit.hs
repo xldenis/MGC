@@ -2,7 +2,6 @@ module MGC.Emit where
 
 import Prelude hiding (mod, div, not)
 
-
 import MGC.Syntax as S
 import MGC.Check (Ann(..), typeOf, annOf)
 import MGC.Codegen
@@ -16,6 +15,7 @@ import LLVM.General.PassManager
 
 import Control.Monad
 import Control.Monad.Except
+import Data.List (findIndex)
 
 codegenTop :: TopLevelDeclaration Ann -> LLVM ()
 codegenTop (FunctionDecl nm sig body) = do
@@ -154,6 +154,14 @@ codegenExpr (Arguments tp fn args) = do
 codegenExpr (Name tp id) = do
   op <- getvar (AST.Name id)
   load (lltype $ ty tp) op -- NEED TO IMPLEMENT NAME TABLE
+-- codegenExpr (Index tp arr idx) = do
+--   array  <- codegenExpr arr
+codegenExpr s@(Selector a _ _) = do
+  ptr <- getaddr s
+  load (lltype $ ty a) ptr
+codegenExpr arr@(Index a _ _) = do
+  ptr <- getaddr arr
+  load (lltype $ ty a) ptr
 --Conversion a Type (Expression a)
 --Selector a (Expression a) Identifier
 --Index a (Expression a) (Expression a)
@@ -165,6 +173,19 @@ codegenExpr (Name tp id) = do
 --IntString String 
 --Bool Bool this is an int
 --RawString String
+
+getaddr :: Expression Ann -> Codegen AST.Operand
+getaddr (Name t x) = getvar (AST.Name x) 
+getaddr (Selector a s nm) = do
+  struct <- getaddr s
+  idx <- case fieldIdx (typeOf s) nm of
+    Just i -> return $ cons $ C.Int 64 (toInteger i)
+    Nothing -> error $ "Invalid field access"
+  gep (lltype $ ty a) struct idx
+getaddr (S.Index a s i) = do
+  arr <- getaddr s
+  idx <- codegenExpr i
+  gep (lltype $ ty a) arr idx
 
 binFunc :: BinOp -> Type -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 binFunc BitAnd _ = band
@@ -199,6 +220,6 @@ testCode mod = do
   withContext $ \ctxt ->
     runExceptT $ withModuleFromAST ctxt mod $ \m -> do
       withPassManager defaultCuratedPassSetSpec {optLevel = Just 3} $ \pm -> do
-        runPassManager pm m
+        -- runPassManager pm m
         s <- moduleLLVMAssembly m
         putStrLn s

@@ -71,7 +71,7 @@ handleFile fname = do
     Right ast -> case runWeeder ast of 
       Left err -> putStrLn $ fname ++ " got " ++ (show err)
       Right ast -> do
-        putStrLn $ fname ++ " " ++ "parsed"
+        putStr $ fname ++ " " ++ "parsed "
         case (typecheck ast) of
-          (Right _,(l,_,_ ))-> putStrLn $ "Typechecked" ++ "\n"++ l
-          (Left err, (l,_,_)) -> putStrLn $ show err ++ "\n" ++ l        
+          (Right _,(l,_,_ ))-> putStrLn $ "typechecked" ++ "\n"
+          (Left err, (l,_,_)) -> putStrLn $ show err ++ "\n"       

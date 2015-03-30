@@ -220,7 +220,7 @@ module MGC.Check where
         a | isNumOp a -> when ((lhtp /= rhtp) || not (isNum lhraw)) $ throwError (InvalidOpType a lh rh)
         a | isIntOp a -> when ((lhtp /= rhtp) || not (isInt lhraw)) $ throwError (InvalidOpType a lh rh)
         a             -> when ((lhtp /= rhtp) || not (TBool==lhraw)) $ throwError (InvalidOpType a lh rh)
-      return $ BinaryOp (ann $ binOpTp op lhtp) op lh rh
+      return $ BinaryOp (binOpAnn op lhtp lhraw) op lh rh
     check (UnaryOp () op r) = do -- check op type
       rh <- check r
       case op of
@@ -351,10 +351,11 @@ module MGC.Check where
   isAlias (TypeName _)  = True
   isAlias _ = False
 
-  binOpTp :: BinOp -> Type -> Type
-  binOpTp o t | isIntOp o = TInteger
-              | isNumOp o = t
-  binOpTp _ _             = TBool
+  binOpAnn :: BinOp -> Type -> Type -> Ann
+  binOpAnn Plus t TString     = Ann{ty = t, truety = TString}
+  binOpAnn o t tt | isIntOp o = Ann{ty = if tt == TInteger then t else TInteger, truety = TInteger}
+                  | isNumOp o = Ann{ty = t, truety = tt}
+  binOpAnn _ t tt             = Ann{ty= if tt == TBool then t else TBool, truety = TBool}
 
   hasType t h exp = if typeOf exp == t then return exp else h
 

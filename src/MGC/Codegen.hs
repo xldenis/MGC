@@ -98,9 +98,6 @@ module MGC.Codegen where
       Just x -> return x
       Nothing -> error $ "not possible" -- refactor
 
-  getaddr :: S.Expression CK.Ann -> Codegen Operand
-  getaddr (S.Name t x) = getvar (Name x) 
-
   entry :: Codegen Name
   entry = gets currentBlock
 
@@ -170,6 +167,16 @@ module MGC.Codegen where
 
   -- Helper methods for LLVM node types
 
+  fieldIdx :: S.Type -> String -> Maybe Int
+  fieldIdx (S.Struct l) s = fieldIdx' l s 0
+  fieldIdx _ _ = Nothing
+
+  fieldIdx' ((S.NamedField ids _ _):ls) s c = case findIndex (\x -> x == s) ids of 
+    Just i  -> Just $ c + i
+    Nothing -> fieldIdx' ls s (c + (length ids))
+  fieldIdx' (_:ls) s c = fieldIdx' ls s (c+1)
+  fieldIdx' _ _ _ = Nothing -- not possible after typechecking
+
   toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
   toArgs = map (\x -> (x, []))
 
@@ -225,6 +232,7 @@ module MGC.Codegen where
   lltype (S.ReturnType tps) = case tps of
     [] -> T.void
     _  -> lltype (head tps)
+  lltype (S.Array l tp) = T.ArrayType (fromIntegral l) (lltype tp)
 
   decType :: S.FieldDecl -> S.Type
   decType (S.AnonField    tp _) = tp
@@ -348,3 +356,6 @@ module MGC.Codegen where
 
   fptoui :: Operand -> Codegen Operand
   fptoui a = instr double $ FPToUI a double []
+
+  gep :: Type -> Operand -> Operand -> Codegen Operand
+  gep t a i = instr t $ GetElementPtr True a [zero, i] []

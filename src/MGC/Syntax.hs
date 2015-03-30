@@ -140,6 +140,7 @@ module MGC.Syntax where
   isIntOp RShift    = True
   isIntOp BitClear  = True
   isIntOp BitXor    = True
+  isIntOp Mod       = True
   isIntOp _         = False
   
   isCmpOp Eq        = True
