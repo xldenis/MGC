@@ -120,6 +120,7 @@ module MGC.Syntax where
   isOrd TInteger = True
   isOrd TRune    = True
   isOrd TString  = True
+  isOrd TFloat   = True
   isOrd _        = False
 
   isNumOp Plus  = True

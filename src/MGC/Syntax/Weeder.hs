@@ -62,7 +62,7 @@ module MGC.Syntax.Weeder where
 
   instance Eq a => Weedable (Statement a) where 
     weed (Switch s e bdy) = liftM3 Switch (weed s) (weed e) (weed bdy)
-    weed (For _ bdy) = modify (\st -> st {loop = True}) >> weed bdy
+    weed (For c bdy) = modify (\st -> st {loop = True}) >> (liftM2 For (weed c) (weed bdy))
     weed (Continue) = (getState loop)>>= (\loop -> if loop
       then return Continue
       else throwError InvalidContinue)
@@ -94,6 +94,11 @@ module MGC.Syntax.Weeder where
       else if op == Eq
         then liftM2 (Assignment op) ((temp (sLhs True)) $ weed lh) (weed rh)
         else liftM2 (Assignment op) (weed lh) (weed rh)
+
+  instance Eq a => Weedable (ForCond a) where
+    weed (Condition e) = Condition <$> weed e
+    weed (ForClause s e p) = liftM3 ForClause (weed s) (weed e) (weed p)
+
   instance Weedable TypeSpec where
     weed (TypeSpec iden tp) = TypeSpec iden <$> (weed tp)
 

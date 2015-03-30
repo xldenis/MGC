@@ -86,7 +86,6 @@ module MGC.Check where
     check (Return exps) = do
       (_, tp, _) <- get
       e <- checkList exps
-
       tps <- mapM (\x -> case typeOf x of
         ReturnType t -> case length t of
           0 -> throwError InvalidReturn
@@ -95,7 +94,6 @@ module MGC.Check where
             then return t 
             else throwError $ InvalidReturn
         a -> return [a]) e
-
       case (ret tp) of
         ReturnType t -> when (t /= (concat tps)) $ throwError $ InvalidReturn
         TNil -> when (length e /= 0) $ throwError $ InvalidReturn
@@ -142,30 +140,32 @@ module MGC.Check where
     check (ExpressionStmt e) = ExpressionStmt <$> (check e)
     check (Inc exp) = do
       e <- check exp
-      case (typeOf e) of
+      case (truety $ annOf e) of
         TRune -> return $ Inc e
         TString -> return $ Inc e
         TFloat -> return $ Inc e
+        TInteger -> return $ Inc e
         t -> throwError $ InvalidIncDec e t
     check (Dec exp) = do
       e <- check exp
-      case (typeOf e) of
-        TRune -> return $ Inc e
-        TString -> return $ Inc e
-        TFloat -> return $ Inc e
+      case (truety $ annOf e) of
+        TRune -> return $ Dec e
+        TString -> return $ Dec e
+        TFloat -> return $ Dec e
+        TInteger -> return $ Dec e
         t -> throwError $ InvalidIncDec e t
     check (Assignment Eq lh rh) = do
       lhs <- checkList lh
       rhs <- checkList rh
-      mapM (\(l, r) -> when ((typeOf l) /= (typeOf r)) $ throwError (Mismatch (typeOf l) (typeOf r))) $ zip lhs rhs
+      mapM (\(l, r) -> when (l /= r) $ throwError (Mismatch l r)) $ zip (typeList lhs) (typeList rhs)
       return $ Assignment Eq  lhs rhs
     check (Assignment op lh rh) = do --accept += string
       lhs <- checkList lh
       rhs <- checkList rh
-      mapM (\(l, r) -> when ((typeOf l) /= (typeOf r)) $ throwError (Mismatch (typeOf l) (typeOf r))) $ zip lhs rhs
+      mapM (\(l, r) -> when (l /= r) $ throwError (Mismatch l r)) $ zip (typeList lhs) (typeList rhs)
       alLhs <- alias $ typeOf $ head lhs
       if isNumOp op
-      then when (not $ isNum $ alLhs) $ throwError (InvalidOpType op (head lhs) (head rhs))
+      then when (not $ (TString == (truety $ annOf $ head rhs)) || (isNum $ alLhs)) $ throwError (InvalidOpType op (head lhs) (head rhs))
       else when (not $ isInt $ alLhs) $ throwError (InvalidOpType op (head lhs) (head rhs))
       return $ Assignment op lhs rhs
     check (ShortDecl idents exps) = do
@@ -210,12 +210,12 @@ module MGC.Check where
     check (BinaryOp () op l r) = do -- check op type
       lh <- check l
       rh <- check r
-
       let lhtp = typeOf rh
           rhtp = typeOf lh
       lhraw <- rawType lhtp
       case op of
-        a | isCmpOp a -> when ((lhtp /= rhtp)) $ throwError (InvalidOpType a lh rh) -- check that non empty fields are eq, check assignabliity
+        a | lhraw == TString -> when ((lhtp /= rhtp) && op == Plus)  $ throwError (InvalidOpType Plus lh rh)
+        a | isCmpOp a -> when (lhtp /= rhtp) $ throwError (InvalidOpType a lh rh) -- check that non empty fields are eq, check assignabliity
         a | isOrdOp a -> when ((lhtp /= rhtp) || not (isOrd lhraw)) $ throwError (InvalidOpType a lh rh)
         a | isNumOp a -> when ((lhtp /= rhtp) || not (isNum lhraw)) $ throwError (InvalidOpType a lh rh)
         a | isIntOp a -> when ((lhtp /= rhtp) || not (isInt lhraw)) $ throwError (InvalidOpType a lh rh)
@@ -224,10 +224,10 @@ module MGC.Check where
     check (UnaryOp () op r) = do -- check op type
       rh <- check r
       case op of
-        Neg   -> when (not$ isNum (typeOf rh)) $ throwError (InvalidUOp op rh)
-        Pos   -> when (not$ isNum (typeOf rh)) $ throwError (InvalidUOp op rh)
-        Not   -> when (not$ (==TBool) (typeOf rh)) $ throwError (InvalidUOp op rh)
-        BComp -> when (not$ isInt (typeOf rh))     $ throwError (InvalidUOp op rh)
+        Neg   -> when (not$ isNum (truety $ annOf rh)) $ throwError (InvalidUOp op rh)
+        Pos   -> when (not$ isNum (truety $ annOf rh)) $ throwError (InvalidUOp op rh)
+        Not   -> when (not$ (==TBool) (truety $ annOf rh)) $ throwError (InvalidUOp op rh)
+        BComp -> when (not$ isInt (truety $ annOf rh))     $ throwError (InvalidUOp op rh)
       return $ UnaryOp (ann $ typeOf rh) op rh
     check (Conversion () tp r) = do
       rh <- check r
@@ -243,15 +243,20 @@ module MGC.Check where
       rawLh <- rawType $ typeOf lh
       case field rawLh i of
         Nothing -> throwError (MissingField (typeOf lh) i)
-        Just tp -> return $ Selector (ann tp) lh i
+        Just tp -> do
+          a <- alias tp
+          t <- rawType tp
+          return $ Selector Ann{ty = a, truety = t} lh i
     check (Index () l ind) = do
       lh  <- check l
       idx <- check ind
-      tp <- case (typeOf lh, typeOf idx) of
+      tp <- case (truety $ annOf lh, typeOf idx) of
           (Slice   t, TInteger) -> return t
           (Array _ t, TInteger) -> return t
           _ -> throwError $ InvalidIndex (typeOf lh) (typeOf idx)
-      return $ Index (ann tp) lh idx
+      a <- alias tp
+      t <- rawType tp
+      return $ Index (Ann{ ty = a, truety = t}) lh idx
     --check (SimpleSlice () l b t)
     --check (FullSlice () l b d t)
     check (Arguments () (Name () "println") a) = do
@@ -366,6 +371,12 @@ module MGC.Check where
   alias :: Type -> Check Type
   alias (TypeName t) = ty <$> checkVar t
   alias a = return a
+
+  typeList :: [Expression Ann] -> [Type]
+  typeList (x:xs) = case typeOf x of 
+    ReturnType ts -> ts ++ (typeList xs)
+    t -> t:(typeList xs)
+  typeList [] = []
 
   typeOf :: (Expression Ann) -> Type
   typeOf (Integer _)        = TInteger
