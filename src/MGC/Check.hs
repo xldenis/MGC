@@ -64,7 +64,7 @@ module MGC.Check where
       addVar name $ Function sig
       pushScope
       mapM (\(Parameter idens tp) -> mapM (\nm -> addVar nm tp) idens) $ (\(Signature s _) -> s) sig
-      let ret = map (\(Parameter _ tp) -> tp) $ (\(Signature _ s) -> s) sig
+      ret <- mapM (\(Parameter _ tp) -> alias tp) $ (\(Signature _ s) -> s) sig
       let fRet = if length ret == 0 then TNil else ReturnType ret
       modify (\(l,st, e) -> (l, (st {ret= fRet}), e)) 
       b <- case body of
@@ -203,9 +203,8 @@ module MGC.Check where
       return $ VarSpec idens tps (Just t)
 
   instance Checkable (SwitchClause) where
-    check (Default stmts) = Default <$> (checkList stmts)
-    check (Case es stmts) = Case <$> (checkList es) <*> (checkList stmts)
-
+    check (Default stmts) = inScope $ do{ Default <$> (checkList stmts) }
+    check (Case es stmts) = Case <$> (checkList es) <*> (inScope $ checkList stmts)
   instance Checkable Expression where
     check (BinaryOp () op l r) = do -- check op type
       lh <- check l
@@ -275,9 +274,9 @@ module MGC.Check where
       tp' <- rawType $ typeOf (head a')
       let altp = ann $ typeOf (head a')
       tp <- case tp' of
-        Slice t -> return t
+        Slice t -> alias t
         _ -> throwError InvalidAppend
-      when (tp /= (typeOf $ last a')) $ throwError InvalidAppend
+      when (tp /= (typeOf $ last a')) $ throwError $ InvalidAppend
       return $ Arguments (altp) (Name (ann TNil) "append") a'
     check (Arguments () l args) = do
       lh <- check l
@@ -286,7 +285,7 @@ module MGC.Check where
           rh <- checkList args
           if (map typeOf rh) /= (funcTypes farg)
           then throwError $ InvalidFuncCall
-          else return $ Arguments (Ann{ty = ReturnType $ funcTypes tp, truety = ReturnType $ funcTypes tp}) lh rh
+          else return $ Arguments (Ann{ty = head $ funcTypes tp, truety =head $ funcTypes tp}) lh rh
         (t, Name _ n) -> if not (isAlias t || isPrim t) 
           then  throwError $  InvalidFuncCall
           else if length args == 1
@@ -362,7 +361,7 @@ module MGC.Check where
                   | isNumOp o = Ann{ty = t, truety = tt}
   binOpAnn _ t tt             = Ann{ty= if tt == TBool then t else TBool, truety = TBool}
 
-  hasType t h exp = if typeOf exp == t then return exp else h
+  hasType t h exp = if (truety $ annOf exp) == t then return exp else h
 
   rawType :: Type -> Check Type
   rawType (TypeName t) = (checkVar t) >>= (\x -> rawType $ ty x)
@@ -395,7 +394,10 @@ module MGC.Check where
   typeOf (SimpleSlice a _ _ _) = ty a
   typeOf (FullSlice a _ _ _ _) = ty a
   typeOf (QualName _ _) = TInteger
-
+  
+  ttOf :: (Expression Ann) -> Type
+  ttOf = truety . annOf
+  
   annOf :: (Expression Ann) -> Ann
   annOf (Integer _)        = ann TInteger
   annOf (Float _)          = ann TFloat 
@@ -441,6 +443,9 @@ module MGC.Check where
           put (log, ret, env)
           return tp
         (Just t) -> return t
+
+  inScope :: Check a -> Check a
+  inScope c = do{pushScope; r <- c; popScope; return r} 
 
   pushScope :: Check ()
   pushScope = do

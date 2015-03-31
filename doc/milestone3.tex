@@ -1,0 +1,96 @@
+% Document Type: LaTeX
+\documentclass[11pt]{article}
+
+\usepackage[parfill]{parskip}
+\usepackage{listings}
+\usepackage[style=ieee]{biblatex}
+\addbibresource{references.bib}
+
+%%% Uncomment any of the macro packages below if you need them.
+
+%% Math symbols.  Probably these are needed if you are doing logic
+\usepackage{amsmath,amssymb,latexsym,stmaryrd,amsthm}
+
+%% Best drawing package ever
+%\usepackage{tikz}
+%\usetikzlibrary{automata,arrows}
+
+%% For including pictures in ps, eps, pdf or jpeg etc.
+\usepackage{graphicx}
+
+%% Use at your own peril
+%\usepackage{pstricks}
+
+%% Good for typesetting proof trees
+%\usepackage{proof}
+\usepackage{bussproofs}
+%% Don't use colours unless you have to.
+%\usepackage{color}
+
+%% This is for checking the format.  It will generate pages of drivel that
+%% vaguely resembles a comic-book parody of Latin.
+\usepackage{lipsum}
+
+\newtheorem{defin}{Definition}
+
+%% If you create macros (and you should) uncomment this.
+%\include{macros}
+\begin{document}
+% \bibliographystyle{alpha} % 
+
+\title{Milestone 3: Go Parser}
+\author{Xavier Denis}
+\date{\today}
+\maketitle
+
+I've chosen to generate working LLVM IR code for this project. While there is good support for LLVM in Haskell, there are a few issues specifically with dynamically sized types (slices, strings) and heap allocated types (struct, array, slice, string). Most of these issues are resolved by writing the necessary implementations directly in IR and linking the modules together. 
+
+\begin{enumerate}
+\item Codegen monads: I implemented the groundwork for codegen in the form of a series of monads which wrap up all generation instructions nicely. Additionally, I wrote wrappers for all instructions required for golite. 
+\item Bug fixes: Fixed many issues brought up during the milestone 2 review.
+\item Change annotation type: The annotation type used to carry type information in the tree was changed to a record type. This allows for raw type information to be passed along. Additionally, it makes the code more flexible and extensible. 
+\item Quasiquoter: To aid in testing, a quasiquoter was implemented for both Top Level Declarations and Packages.
+\item Implemented Codegen Rules: \begin{enumerate}
+  \item Package
+  \item Global Type Defs: Currently there is still an issue with types that share the same name
+  \item Statements: \begin{enumerate}
+    \item Return: Bugs for void returns
+    \item Expression Statements
+    \item If Statements
+    \item Empty
+    \item Inc / Dec: Only works for int types and aliases
+    \item Block
+    \item While-For
+    \item For-Clause
+    \item For-Empty
+    \item Variable Declarations
+    \item Short Declarations
+    \item Assignments
+    \item Type Declarations
+  \end{enumerate}
+  \item Expressions: \begin {enumerate}
+    \item Binary Op: All but bitclear
+    \item UnaryOp
+    \item Integers
+    \item Floats
+    \item Bools
+    \item Func. Calls
+    \item Variable reference
+    \item Selector
+    \item Index: Not bounds checked yet
+  \end{enumerate}
+\end {enumerate}
+
+\item Notable Issues: \begin{enumerate}
+  \item Allocations are all made to stack. Need to move them all to the heap.
+  \item Variable sized types. Those will require special support in the form of custom IR implementations
+  \item Builtin Functions: Similarily to variable sized types those will require special support.
+  \item Exceptions: LLVM supports zero cost exceptions through the Itanium ABI however, I need to do more research on how to actually implement / use that. 
+\end{enumerate}
+\end{enumerate}
+
+\section {Work Split}
+
+I, Xavier Denis, did this entire milestone.
+
+\end{document}

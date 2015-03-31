@@ -37,3 +37,20 @@ tld = QuasiQuoter {
   , quoteType = undefined
   , quoteDec = undefined
 }
+
+pkg :: QuasiQuoter
+pkg = QuasiQuoter {
+  quoteExp = \str -> do
+    l <- location'
+    c <- case parse (setPosition l *> spaces *> package) "" str of
+      Left e -> error $ show e
+      Right a -> case runWeeder a of
+        Left e -> error $ show e
+        Right a -> case (runCheck "" [M.empty]) $ check a of
+          (Left e, _) -> error $ show e 
+          (Right a, _) -> return a
+    dataToExpQ (const Nothing) c
+  , quotePat  = undefined
+  , quoteType = undefined
+  , quoteDec  = undefined
+}
