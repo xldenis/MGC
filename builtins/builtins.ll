@@ -1,4 +1,9 @@
 
+;;------------------------------------------------
+;; SLICE FUNCTIONS
+;;------------------------------------------------
+
+
 %slice = type {
   i32, ;; cur len
   i32, ;; max cap
@@ -119,5 +124,37 @@ define fastcc %slice* @append(%slice* %this, i8* %el) {
   %10 = getelementptr i8* %8, i32 %9
 
   call i8* @memcpy(i8* %10, i8* %el, i32 %elsz)
+
+  ret %slice* %ret
+}
+
+;;------------------------------------------------
+;; STRING FUNCTIONS
+;;------------------------------------------------
+
+define %slice* @add_string(%slice* %a, %slice* %b) {
+  %1 = getelementptr %slice* %a, i32 0, i32 0
+  %2 = getelementptr %slice* %b, i32 0, i32 0
+
+  %alen = load i32* %1
+  %blen = load i32* %2
+
+  %nlen = add i32 %alen, %blen
+
+  %ret = call %slice* @new_slice(i32 %nlen,i32 %nlen, i32 1)
+
+  %3 = getelementptr %slice* %a, i32 0, i32 3
+  %4 = getelementptr %slice* %b, i32 0, i32 3
+
+  %5 = load i8** %3
+  %6 = load i8** %4
+
+  %7 = getelementptr i8* %6, i32 %alen
+
+  %8 = getelementptr %slice* %ret, i32 0, i32 3
+  %9 = load i8** %8
+  call i8* @memcpy(i8* %9, i8* %5, i32 %alen)
+  call i8* @memcpy(i8* %9, i8* %7, i32 %blen)
+
   ret %slice* %ret
 }
