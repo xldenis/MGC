@@ -29,6 +29,8 @@ module MGC.Codegen where
     , assigned     :: Map.Map Name Operand     -- Assigned var addrs                     
     , blockCount   :: Int                      -- Count of basic blocks
     , count        :: Word                     -- Count of unnamed instructions
+    , names        :: Map.Map String Int       -- Redeclarations of name
+    , types        :: [S.TypeSpec]
     } deriving Show
 
   data BlockState
@@ -73,6 +75,9 @@ module MGC.Codegen where
     , basicBlocks = []
     }
 
+  typedef :: Name -> Type -> LLVM ()
+  typedef nm tp = addDefn $ TypeDefinition nm (Just tp)
+
   -- Codegen helpers
 
   fresh :: Codegen Word
@@ -81,10 +86,11 @@ module MGC.Codegen where
     modify $ \s -> s { count = 1 + i }
     return $ i + 1 
 
-  uniqueName :: String -> Codegen String
-  uniqueName nm = do -- fix entry block name
-    idx <- fresh
-    return $ nm ++ (show idx)
+  uniqueName :: String -> Map.Map String Int -> (String, Map.Map String Int)
+  uniqueName nm nms = do -- fix entry block name
+    case Map.lookup nm nms of
+      Nothing -> (nm,  Map.insert nm 1 nms)
+      Just ix -> (nm ++ show ix, Map.insert nm (ix+1) nms)
 
   assign :: Name -> Operand -> Codegen ()
   assign nm op = do
@@ -108,7 +114,7 @@ module MGC.Codegen where
   entryBlockName = "entry"
 
   emptyCodegen :: CodegenState
-  emptyCodegen = CodegenState (Name entryBlockName) Map.empty Map.empty 1 0
+  emptyCodegen = CodegenState (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty []
 
   createBlocks :: CodegenState -> [BasicBlock]
   createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
@@ -126,12 +132,12 @@ module MGC.Codegen where
   addBlock bname = do
     bls <- gets blocks
     ix  <- gets blockCount
-    qname <- uniqueName bname
-
+    nms <- gets names
     let new = emptyBlock ix
-
+        (qname, supply) = uniqueName bname nms
     modify $ \s -> s { blocks = Map.insert (Name qname) new bls
                      , blockCount = ix + 1
+                     , names = supply
                      }
     return (Name qname)
 
@@ -233,7 +239,7 @@ module MGC.Codegen where
     [] -> T.void
     _  -> lltype (head tps)
   lltype (S.Array l tp) = T.ArrayType (fromIntegral l) (lltype tp)
-
+  lltype (S.TypeName n) = T.NamedTypeReference (Name n)
   decType :: S.FieldDecl -> S.Type
   decType (S.AnonField    tp _) = tp
   decType (S.NamedField _ tp _) = tp
@@ -261,6 +267,9 @@ module MGC.Codegen where
   ret :: Operand -> Codegen (Named Terminator)
   ret val = terminator $ Do $ Ret (Just val) []
 
+  retvoid :: Codegen (Named Terminator)
+  retvoid = terminator $ Do $ Ret Nothing []
+  
   add :: S.Type -> Operand -> Operand -> Codegen Operand
   add tp a b = case tp of
     S.TInteger -> instr int $ Add False False a b []
