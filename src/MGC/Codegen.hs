@@ -368,3 +368,11 @@ module MGC.Codegen where
 
   gep :: Type -> Operand -> Operand -> Codegen Operand
   gep t a i = instr t $ GetElementPtr True a [zero, i] []
+
+  ckbnds :: S.Type -> Operand -> Operand -> Codegen Operand 
+  ckbnds (S.Slice _) s i  = do
+    len <- gep T.i32 s zero
+    lt S.TInteger i len
+  ckbnds (S.Array l _) s i = do
+    len <- cons $ C.Int 64 (toInteger l)
+    lt S.TInteger i len
