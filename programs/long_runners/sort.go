@@ -1,7 +1,7 @@
 package main
 
 func main() {
-  var l = 50000
+  var l = 5 0000
   var list []int
   for i := 0; i < l; i++ {
     list = append(list, l - i)

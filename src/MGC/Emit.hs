@@ -11,20 +11,31 @@ import LLVM.General.Module
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST as AST
+import qualified LLVM.General.AST.Type as T
+import qualified LLVM.General.Target as TM
+
+import LLVM.General.PrettyPrint
 import LLVM.General.PassManager
 
 import Control.Monad
 import Control.Monad.State (modify)
 import Control.Monad.Except
 import Data.List (findIndex)
+import Data.Either (rights)
+
+import MGC.Parser.Quote
+
 
 codegenPkg :: Package Ann -> LLVM ()
 codegenPkg (Package nm tlds) = do
   modify (\s -> s {AST.moduleName = nm})
+  typedef (AST.Name "slice") llslice
+  define (llsliceptr) "new_slice" [(T.i32, AST.UnName 0), (T.i32, AST.UnName 0) , (T.i32, AST.UnName 0)] []
   mapM codegenTop tlds
   return ()
 
 codegenTop :: TopLevelDeclaration Ann -> LLVM ()
+codegenTop (FunctionDecl nm sig Empty) = define (lltype $ retty sig) nm (argty sig) []
 codegenTop (FunctionDecl nm sig body) = do
   codegenTop (Decl (TypeDecl $ types cg))
   define (lltype $ retty  sig) nm largs blks
@@ -149,7 +160,11 @@ codegenCond Nothing = return true
 codegenSpec :: VarSpec Ann -> Codegen ()
 codegenSpec (VarSpec idens [] (Just tp)) = do
   mapM (\n -> do
-    i <- alloca $ lltype tp
+    i <- case tp of 
+      Slice t -> call llsliceptr (externf llnewslice (AST.Name "new_slice")) [llint 10, llint 10, llint 1]
+        where sltp = (lltype $ TypeName "slice")
+      _ -> alloca $ lltype tp
+
     assign (AST.Name n) i) idens >> return ()
 codegenSpec (VarSpec idens exps _) = do
   mapM (\(n, e) -> do
@@ -158,6 +173,8 @@ codegenSpec (VarSpec idens exps _) = do
     val <- codegenExpr e
     store tp i val
     assign (AST.Name n) i) (zip idens exps) >> return ()
+
+llint i = cons $ C.Int 32 (toInteger i)
 
 codegenExpr :: Expression Ann -> Codegen AST.Operand
 codegenExpr (BinaryOp tp op a b) = do
@@ -190,17 +207,24 @@ codegenExpr arr@(Index a _ _) = do
 --RawString String
 
 getaddr :: Expression Ann -> Codegen AST.Operand
-getaddr (Name t x) = getvar (AST.Name x) 
+getaddr (Name _ x) = getvar (AST.Name x) 
 getaddr (Selector a s nm) = do
   struct <- getaddr s
   idx <- case fieldIdx (typeOf s) nm of
     Just i -> return $ cons $ C.Int 64 (toInteger i)
     Nothing -> error $ "Invalid field access"
-  gep (lltype $ truety a) struct idx
+  gep (lltype $ truety a) struct [zero, idx]
 getaddr (S.Index a s i) = do
   arr <- getaddr s
-  idx <- codegenExpr i
-  gep (lltype $ truety a) arr idx
+  longId <- codegenExpr i
+  idx <- trunc longId i32
+  elsize <- gep (ptr $ i32) arr [zero, llint 2] >>= load i32
+
+  offset <- imul i32 idx elsize
+  bufPtrPtr <- gep (ptr $ ptr $ char) arr [zero, llint 3]
+  bufPtr    <- load (ptr $ ptr $ char) bufPtrPtr
+  addr <- gep (ptr $ char) bufPtr [offset]
+  bitcast addr (ptr $ lltype $ truety a)
 
 binFunc :: BinOp -> Type -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 binFunc BitAnd _ = band
@@ -234,10 +258,21 @@ unalias :: Ann -> Type
 unalias a = case (ty a, truety a) of
   (TypeName n, Struct _) -> TypeName n
   (_, tt ) -> tt 
-testCode mod = do
-  withContext $ \ctxt ->
-    runExceptT $ withModuleFromAST ctxt mod $ \m -> do
-      withPassManager defaultCuratedPassSetSpec {optLevel = Just 3} $ \pm -> do
-        -- runPassManager pm m
-        s <- moduleLLVMAssembly m
-        putStrLn s
+
+testCode pkg = do
+  withContext $ \ctxt -> do
+    runExceptT $ withModuleFromLLVMAssembly ctxt (File "builtins/builtins.ll") $ \builtins -> do
+      runExceptT $ withModuleFromAST ctxt pkg $ \m -> do
+        withPassManager defaultCuratedPassSetSpec $ \pm -> do
+          runExceptT $ linkModules False m builtins
+          -- runPassManager pm m
+          runExceptT $ writeLLVMAssemblyToFile (File "output.ll") m
+          runExceptT $ TM.withDefaultTargetMachine $ \target -> do
+            runExceptT $ writeTargetAssemblyToFile target (File "output.s") m
+  return ()
+testParse s = do
+  withContext $ \ctxt -> do
+    m <- runExceptT $ withModuleFromLLVMAssembly ctxt s $ return
+
+    return m
+

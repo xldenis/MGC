@@ -34,6 +34,9 @@ define fastcc %slice* @new_slice(i32 %length, i32 %capacity, i32 %tylen) nounwin
   %elszptr  = getelementptr %slice* %res, i32 0, i32 2
   store i32 %tylen, i32* %elszptr
 
+  %bufptr   = getelementptr %slice* %res, i32 0, i32 3
+  store i8* %ptr, i8** %bufptr
+
   ret %slice* %res
 }
 

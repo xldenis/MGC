@@ -12,6 +12,7 @@ module MGC.Codegen where
   import LLVM.General.AST
   import LLVM.General.AST.Global
 
+  import qualified LLVM.General.AST.AddrSpace as AS
   import qualified LLVM.General.AST.CallingConvention as CC
   import qualified LLVM.General.AST.Constant as C
   import qualified LLVM.General.AST.Attribute as A
@@ -225,11 +226,21 @@ module MGC.Codegen where
   int :: Type
   int = T.i64
 
+  i32 :: Type
+  i32 = T.i32
+
   bool :: Type
   bool = T.i1
 
   char :: Type
   char = T.i8  
+
+  sizeof :: Type -> Operand
+  sizeof t = cons $ C.GetElementPtr False (C.Null . ptr $ t) [C.Int  64 1]
+
+  llslice = T.StructureType False [T.i32, T.i32, T.i32, T.PointerType T.i8 (AS.AddrSpace 0)]
+  llsliceptr = T.PointerType (lltype $ S.TypeName "slice") (AS.AddrSpace 0)
+  llnewslice = T.FunctionType (llsliceptr) [T.i32, T.i32, T.i32] False
 
   lltype :: S.Type -> Type
   lltype S.TInteger = int
@@ -240,6 +251,12 @@ module MGC.Codegen where
     _  -> lltype (head tps)
   lltype (S.Array l tp) = T.ArrayType (fromIntegral l) (lltype tp)
   lltype (S.TypeName n) = T.NamedTypeReference (Name n)
+  lltype (S.Slice tp)   = T.NamedTypeReference (Name "slice")
+  lltype (S.TString )   = T.NamedTypeReference (Name "slice")
+
+  ptr :: Type -> Type
+  ptr t = T.PointerType t (AS.AddrSpace 0)
+
   decType :: S.FieldDecl -> S.Type
   decType (S.AnonField    tp _) = tp
   decType (S.NamedField _ tp _) = tp
@@ -247,7 +264,7 @@ module MGC.Codegen where
   -- Constants
   maxInt = cons $ C.Int 64 9223372036854775807
 
-  one = cons  $ C.Int  64 1
+  one  = cons $ C.Int  64 1
   zero = cons $ C.Int 64 0
 
   false = cons $ C.Int 1 0
@@ -284,9 +301,12 @@ module MGC.Codegen where
 
   mul :: S.Type -> Operand -> Operand -> Codegen Operand
   mul tp a b = case tp of
-    S.TInteger -> instr int $ Mul False False a b []
+    S.TInteger -> imul int a b
     S.TFloat   -> instr double $ FMul NoFastMathFlags a b []
     _ -> error $ "impossible"
+
+  imul :: Type -> Operand -> Operand -> Codegen Operand
+  imul t a b = instr t $ Mul False False a b []
 
   div :: S.Type -> Operand -> Operand -> Codegen Operand
   div tp a b = case tp of
@@ -366,13 +386,22 @@ module MGC.Codegen where
   fptoui :: Operand -> Codegen Operand
   fptoui a = instr double $ FPToUI a double []
 
-  gep :: Type -> Operand -> Operand -> Codegen Operand
-  gep t a i = instr t $ GetElementPtr True a [zero, i] []
+  bitcast :: Operand -> Type -> Codegen Operand
+  bitcast o t = instr t $ BitCast o t []
 
-  ckbnds :: S.Type -> Operand -> Operand -> Codegen Operand 
+  trunc :: Operand -> Type -> Codegen Operand
+  trunc o t = instr t $ Trunc o t []
+
+  gep :: Type -> Operand -> [Operand] -> Codegen Operand
+  gep t a i = instr t $ GetElementPtr False a i []
+
+  ckbnds :: S.Type -> Operand -> Operand -> Codegen () 
   ckbnds (S.Slice _) s i  = do
-    len <- gep T.i32 s zero
+    len <- gep T.i32 s [zero, zero]
     lt S.TInteger i len
+    return ()
+
   ckbnds (S.Array l _) s i = do
-    len <- cons $ C.Int 64 (toInteger l)
+    len <- return $ cons $ C.Int 64 (toInteger l)
     lt S.TInteger i len
+    return ()
