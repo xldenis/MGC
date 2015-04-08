@@ -1,13 +1,18 @@
 module MGC.Emit where
 
 import Prelude hiding (mod, div, not)
+import Control.Monad
+import Control.Monad.State (modify, gets)
+import Control.Monad.Except
+import Data.List (findIndex, sortBy)
+import Data.Ord  (Ordering(..))
+import Data.Either (rights)
 
 import MGC.Syntax as S
 import MGC.Check (Ann(..), typeOf, annOf, ttOf)
 import MGC.Codegen
+import MGC.Parser.Quote
 
-import LLVM.General.Context
-import LLVM.General.Module
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST as AST
@@ -16,15 +21,8 @@ import qualified LLVM.General.Target as TM
 
 import LLVM.General.PrettyPrint
 import LLVM.General.PassManager
-
-import Control.Monad
-import Control.Monad.State (modify)
-import Control.Monad.Except
-import Data.List (findIndex)
-import Data.Either (rights)
-
-import MGC.Parser.Quote
-
+import LLVM.General.Context
+import LLVM.General.Module
 
 codegenPkg :: Package Ann -> LLVM ()
 codegenPkg (Package nm tlds) = do
@@ -145,13 +143,63 @@ codegenStmt (Assignment op lh rh) = do
   return ()
 codegenStmt (TypeDecl ts) = do
   modify (\s -> s { types = (types s) ++ ts })
+codegenStmt (Switch s exp clauses) = do
+  codegenStmt s
+  cases <- return $ sortBy (\a b -> case (a,b) of
+    (Case _ _, Default _) -> LT
+    (Default _, Case _ _) -> GT
+    _ -> EQ) clauses
+  blocks <- mapM (\c -> do
+    let n = case c of
+              (Case _ _) -> "clause"
+              _ -> "default"
+    head <- addBlock $ n ++ ".head"
+    body <- addBlock $ n ++ ".body"
+    return (head, body) 
+    ) cases
+  end <- addBlock "switch.end"
+
+  br (fst . head $ blocks)
+  test <- case exp of
+    Just x -> do{cond <- codegenExpr x; return $ \n -> codegenExpr n >>= (eq (truety $ annOf x) cond)}
+    Nothing -> return $ codegenExpr
+    
+  prevState <- gets nextBlock
+  mapM (\(((h,b), c):((next,nextBody), _):[]) -> do
+      setBlock h
+      cond <- case c of
+        (Case exps body) -> foldM (\p n -> do
+          e <- test n
+          bor e p) false exps
+        (Default _ ) -> return true
+      cbr cond b next
+      setBlock b 
+      modify (\s -> s{ nextBlock = Just nextBody})
+      (\c -> case c of 
+        (Case _ b) -> mapM codegenStmt b
+        (Default b) -> mapM codegenStmt b)  c
+      br end
+    ) $ windowed $ (zip blocks cases)++[((end,end),(head cases))]
+  modify (\s -> s {nextBlock = prevState})
+  setBlock end
+
+  return ()
+codegenStmt Fallthrough = do
+  blk <- gets nextBlock
+  case blk of -- because of weeding this is the only possible case
+    Just b -> br b
+  return ()
+
 -- Break
 -- Continue -- need to keep track of loops 
--- Assignment BinOp [Expression a] [Expression a]
--- Fallthrough -- need to keep track of switches
--- For (Maybe (ForCond a)) (Statement a) -- need to implement clause looops
--- Switch (Statement a) (Maybe (Expression a)) [SwitchClause a]
--- TypeDecl [TypeSpec]
+
+windowed ls = 
+    (case ls of 
+      [] -> []
+      x:xs -> 
+        if length ls >= 2 then 
+          (take 2 ls) : windowed xs
+        else windowed xs)
 
 codegenCond :: Maybe (ForCond Ann) -> Codegen AST.Operand
 codegenCond (Just (Condition e)) = codegenExpr e
@@ -228,7 +276,7 @@ getaddr (S.Index a s i) = do
 
 binFunc :: BinOp -> Type -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 binFunc BitAnd _ = band
---binFunc BitClear = bclear
+binFunc BitClear _ = bclear
 binFunc BitOr  _ = bor
 binFunc BitXor _ = xor
 binFunc Div   t = div t
@@ -270,9 +318,10 @@ testCode pkg = do
           runExceptT $ TM.withDefaultTargetMachine $ \target -> do
             runExceptT $ writeTargetAssemblyToFile target (File "output.s") m
   return ()
+
 testParse s = do
   withContext $ \ctxt -> do
-    m <- runExceptT $ withModuleFromLLVMAssembly ctxt s $ return
-
-    return m
+    runExceptT $ withModuleFromAST ctxt s $ \m -> do
+      str <- moduleLLVMAssembly m
+      putStrLn str
 

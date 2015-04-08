@@ -6,6 +6,8 @@ module MGC.Codegen where
   import Data.Function
   import qualified Data.Map as Map
 
+  import Prelude hiding (mod, div, not, and)
+
   import Control.Monad.State
   import Control.Applicative (Applicative)
 
@@ -31,7 +33,8 @@ module MGC.Codegen where
     , blockCount   :: Int                      -- Count of basic blocks
     , count        :: Word                     -- Count of unnamed instructions
     , names        :: Map.Map String Int       -- Redeclarations of name
-    , types        :: [S.TypeSpec]
+    , types        :: [S.TypeSpec]             -- type declarations to propagate upwards
+    , nextBlock    :: Maybe Name               -- Block to Fallthrough to in switches
     } deriving Show
 
   data BlockState
@@ -115,7 +118,7 @@ module MGC.Codegen where
   entryBlockName = "entry"
 
   emptyCodegen :: CodegenState
-  emptyCodegen = CodegenState (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty []
+  emptyCodegen = CodegenState (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty [] Nothing
 
   createBlocks :: CodegenState -> [BasicBlock]
   createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
@@ -334,6 +337,9 @@ module MGC.Codegen where
 
   not :: Operand -> Codegen Operand
   not a = instr bool $ Xor a true []
+
+  bclear :: Operand -> Operand -> Codegen Operand
+  bclear a b = (not b) >>= (band a)
 
   bcomp :: Operand -> Codegen Operand
   bcomp a = xor a maxInt

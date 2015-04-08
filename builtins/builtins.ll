@@ -41,7 +41,8 @@ define fastcc %slice* @new_slice(i32 %length, i32 %capacity, i32 %tylen) nounwin
 }
 
 define fastcc void @del_slice(%slice* %this) nounwind {
-  ;; TODO
+
+  ;; Deallocation is for people who can't scale
 
   ret void
 }
@@ -160,4 +161,41 @@ define %slice* @add_string(%slice* %a, %slice* %b) {
   call i8* @memcpy(i8* %9, i8* %7, i32 %blen)
 
   ret %slice* %ret
+}
+
+declare void @putchar(i8)
+
+define void @println(%slice* %this) {
+  %1 = getelementptr %slice* %this, i32 0, i32 0
+  %len = load i32* %1
+
+  %2 = getelementptr %slice* %this, i32 0, i32 2
+  %elsz = load i32* %2
+
+  %3 = getelementptr %slice* %this, i32 0, i32 3
+  %ptr = load i8** %3
+
+  br label %loop
+  
+  loop:
+    %i = phi i32 [%len, %0], [%new_i, %loop]
+    %p = phi i8* [%ptr, %0], [%new_p, %loop]
+
+    %c = load i8* %p
+    call void @putchar(i8 %c)
+
+    %new_i  = sub i32 %i, 1
+    %new_p  = getelementptr i8* %p, i32 %elsz
+
+    %test = icmp ne i32 %new_i, 0
+    br i1 %test, label %loop, label %loopdone
+
+  loopdone:  
+
+  ret void
+}
+
+define void @print(%slice*   %this) {
+
+  ret void
 }
