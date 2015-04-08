@@ -50,7 +50,9 @@ codegenTop (FunctionDecl nm sig body) = do
       codegenStmt body
 codegenTop (Decl (TypeDecl ts)) = do
   mapM (\(TypeSpec a n t) -> case truety a of
-    TypeName n -> typedef (AST.Name n) (lltype t)) ts
+    TypeName n -> case t of
+      Struct _ -> typedef (AST.Name n) (lltype t)
+      _ -> return ()) ts
   return ()
 --codegenTop (Decl VarDecl)
 --codegenTop (Decl TypeDecl)
@@ -250,6 +252,14 @@ codegenExpr s@(Selector a _ _) = do
 codegenExpr arr@(Index a _ _) = do
   ptr <- getaddr arr
   load (lltype $ truety a) ptr
+codegenExpr (Conversion a t e) = do
+  exp <- codegenExpr e
+  let converter = case truety a of
+                    TFloat   -> fptosi
+                    TInteger -> sitofp
+  if truety a == (truety $ annOf e)
+  then return $ exp
+  else converter exp
 --Conversion a Type (Expression a)
 --Rune String
 --IntString String 

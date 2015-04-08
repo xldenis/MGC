@@ -390,7 +390,7 @@ module MGC.Codegen where
   uitofp a = instr double $ UIToFP a double []
 
   fptoui :: Operand -> Codegen Operand
-  fptoui a = instr double $ FPToUI a double []
+  fptoui a = instr int $ FPToUI a double []
 
   bitcast :: Operand -> Type -> Codegen Operand
   bitcast o t = instr t $ BitCast o t []
