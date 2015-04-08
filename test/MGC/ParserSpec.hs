@@ -18,9 +18,9 @@ module MGC.ParserSpec (spec) where
 
     describe "typeDec" $ do
       it "parses single types" $ do
-        typeDec `parses` "type IntArray [16]int" ~> TypeDecl [TypeSpec "IntArray" $ Array (16) (TInteger)]
+        typeDec `parses` "type IntArray [16]int" ~> TypeDecl [TypeSpec () "IntArray" $ Array (16) (TInteger)]
       it "parses multi-type delcarations" $ do
-        typeDec `parses` "type ( Polar Point; IntArray [16]int)" ~> TypeDecl [TypeSpec "Polar" (TypeName "Point"), TypeSpec "IntArray" $ Array (16) (TInteger)]
+        typeDec `parses` "type ( Polar Point; IntArray [16]int)" ~> TypeDecl [TypeSpec () "Polar" (TypeName "Point"), TypeSpec () "IntArray" $ Array (16) (TInteger)]
       it "parses multi-line types" $ do
         let test = [string|
           type (
@@ -28,7 +28,7 @@ module MGC.ParserSpec (spec) where
             IntArray [16]int
           )
         |]
-        typeDec `parses` test ~> TypeDecl [TypeSpec "Polar" (TypeName "Point"), TypeSpec "IntArray"  $ Array (16) (TInteger)]
+        typeDec `parses` test ~> TypeDecl [TypeSpec () "Polar" (TypeName "Point"), TypeSpec () "IntArray"  $ Array (16) (TInteger)]
 
     describe "block statement" $ do
       it "allows semi colons" $ do
