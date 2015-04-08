@@ -138,11 +138,11 @@ module MGC.Syntax.Pretty where
       text ident <> (pretty sig) <+> (pretty body)
     pretty (Decl s) = pretty s
 
-  instance Pretty TypeSpec where
-    pretty (TypeSpec ident tp) = (text ident) <+> (pretty tp)
+  instance Pretty (TypeSpec a) where
+    pretty (TypeSpec _ ident tp) = (text ident) <+> (pretty tp)
 
   instance Pretty a => Pretty (VarSpec a) where
-    pretty (VarSpec idents vals tp) = (text $ intercalate ", " idents) <+> (pretty tp) <+> (
+    pretty (VarSpec _ idents vals tp) = (text $ intercalate ", " idents) <+> (pretty tp) <+> (
       if (length vals) > 0
       then (text "=") <+> (pretty vals)
       else empty)

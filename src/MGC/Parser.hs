@@ -52,8 +52,8 @@ module MGC.Parser where
     lexeme "type"
     TypeDecl <$> ( (flip (:) []) <$> typeSpec <|> (parens' $ typeSpec `sepEndBy` semi'))
 
-  typeSpec :: Parser TypeSpec
-  typeSpec =  TypeSpec <$> identifier <*> typeParser
+  typeSpec :: Parser (TypeSpec ())
+  typeSpec =  TypeSpec () <$> identifier <*> typeParser
 
   varDec :: Parser (Statement ())
   varDec = try $ do
@@ -65,7 +65,7 @@ module MGC.Parser where
 
     tp <- optionMaybe typeParser
     exprs <- (try $ lexeme "=" *> expressionList) <|> (return [])
-    return $ VarSpec idents exprs tp
+    return $ VarSpec () idents exprs tp
 
   statement :: Parser (Statement ())
   statement = ((varDec <|> typeDec <|> simpleStatement <|> returnStmt <|> ifStmt <|> 

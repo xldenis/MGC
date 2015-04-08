@@ -78,8 +78,12 @@ module MGC.Check where
 
   instance Checkable Statement where
     check (TypeDecl tps) = do
-      mapM (\(TypeSpec n tp) -> addType n tp) tps
-      return $ TypeDecl tps
+      tps' <- mapM (\(TypeSpec _ n tp) -> do
+        addType n tp
+        uniqNm <- alias $ TypeName n
+        return $ TypeSpec Ann{ty = (TypeName n), truety = uniqNm } n tp
+        ) tps
+      return $ TypeDecl tps'
     check (VarDecl vars) = do
       tps <- checkList vars
       return $ VarDecl tps
@@ -191,20 +195,21 @@ module MGC.Check where
     check (ForClause s Nothing p)  = ForClause <$> (check s) <*> (return Nothing) <*> (check p)
   
   instance Checkable VarSpec where
-    check (VarSpec idens exps Nothing) = do -- dont ignore tp check double declarations
+    check (VarSpec _ idens exps Nothing) = do -- dont ignore tp check double declarations
       tps <- checkList exps
       mapM (\(i, t) -> addVar i (typeOf t) ) $ zip idens tps
-      return $ VarSpec idens tps Nothing
-    check (VarSpec idens exps (Just t)) = do
+      return $ VarSpec (ann TNil) idens tps Nothing
+    check (VarSpec _ idens exps (Just t)) = do
       tps <- checkList exps
       trueT <- alias t
       when (any ((trueT /=).typeOf ) tps) $ throwError $ InvalidVarDec t tps
       mapM (\i -> addVar i trueT ) idens
-      return $ VarSpec idens tps (Just t)
+      return $ VarSpec Ann{ty = t, truety = trueT} idens tps (Just t)
 
   instance Checkable (SwitchClause) where
     check (Default stmts) = inScope $ do{ Default <$> (checkList stmts) }
     check (Case es stmts) = Case <$> (checkList es) <*> (inScope $ checkList stmts)
+
   instance Checkable Expression where
     check (BinaryOp () op l r) = do -- check op type
       lh <- check l
@@ -213,7 +218,7 @@ module MGC.Check where
           rhtp = typeOf lh
       lhraw <- rawType lhtp
       case op of
-        a | lhraw == TString -> when ((lhtp /= rhtp) && op == Plus)  $ throwError (InvalidOpType Plus lh rh)
+        _ | lhraw == TString -> when ((lhtp /= rhtp) && op == Plus)  $ throwError (InvalidOpType Plus lh rh)
         a | isCmpOp a -> when (lhtp /= rhtp) $ throwError (InvalidOpType a lh rh) -- check that non empty fields are eq, check assignabliity
         a | isOrdOp a -> when ((lhtp /= rhtp) || not (isOrd lhraw)) $ throwError (InvalidOpType a lh rh)
         a | isNumOp a -> when ((lhtp /= rhtp) || not (isNum lhraw)) $ throwError (InvalidOpType a lh rh)
@@ -328,7 +333,7 @@ module MGC.Check where
 
   addType' :: Identifier -> Ann -> (String, Counters, Env) -> (String, Counters, Env)
   addType' i t (l, tp, x:xs) = (l,(tp { typCnt = (typCnt tp) + 1}), newX:xs)
-    where incNm = i++"$"++(show $ typCnt tp)
+    where incNm = i++"."++(show $ typCnt tp)
           incTp = TypeName incNm
           newX  = (M.insert i (Ann{ ty = incTp, truety = ty t}) (M.insert incNm t x))
   addType' _ _ (l, tp,   []) = (l, tp, [])

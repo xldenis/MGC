@@ -15,10 +15,6 @@ module MGC.Syntax where
 
   data Parameter = Parameter [Identifier] Type deriving (Show, Eq, Typeable, Data)
 
-  data TypeSpec  = TypeSpec Identifier Type deriving (Show, Eq, Typeable, Data)
-
-  data VarSpec a = VarSpec [Identifier] [Expression a] (Maybe Type)  deriving (Show, Eq, Typeable, Data)
-
   data Expression a
    = BinaryOp a BinOp (Expression a) (Expression a)
    | UnaryOp a UOp (Expression a)
@@ -60,10 +56,14 @@ module MGC.Syntax where
     | Inc (Expression a)
     | ShortDecl [Identifier] [Expression a]
     | Switch (Statement a) (Maybe (Expression a)) [SwitchClause a]
-    | TypeDecl [TypeSpec]
+    | TypeDecl [TypeSpec a]
     | VarDecl [VarSpec a] deriving (Show, Eq, Typeable, Data)
 
   data ForCond a = Condition (Expression a) | ForClause (Statement a) (Maybe (Expression a)) (Statement a)  deriving (Show, Eq, Typeable, Data)
+
+  data TypeSpec a = TypeSpec a Identifier Type deriving (Show, Eq, Typeable, Data)
+
+  data VarSpec a = VarSpec a [Identifier] [Expression a] (Maybe Type) deriving (Show, Eq, Typeable, Data)
 
   data SwitchClause a
     = Default [Statement a]

@@ -99,15 +99,15 @@ module MGC.Syntax.Weeder where
     weed (Condition e) = Condition <$> weed e
     weed (ForClause s e p) = liftM3 ForClause (weed s) (weed e) (weed p)
 
-  instance Weedable TypeSpec where
-    weed (TypeSpec iden tp) = TypeSpec iden <$> (weed tp)
+  instance Weedable (TypeSpec a) where
+    weed (TypeSpec a iden tp) = TypeSpec a iden <$> (weed tp)
 
   instance Weedable (VarSpec a) where
-    weed (VarSpec idens exps Nothing) = if (length idens) == (length exps)
-      then liftM2 (VarSpec idens) (weed exps) (return $ Nothing)
+    weed (VarSpec a idens exps Nothing) = if (length idens) == (length exps)
+      then liftM2 (VarSpec a idens) (weed exps) (return $ Nothing)
       else throwError AssignSizeDifferent
-    weed (VarSpec idens exps tp) = if (length exps == 0) || (length idens == length exps)
-      then liftM2 (VarSpec idens) (weed exps) (weed tp)
+    weed (VarSpec a idens exps tp) = if (length exps == 0) || (length idens == length exps)
+      then liftM2 (VarSpec a idens) (weed exps) (weed tp)
       else throwError AssignSizeDifferent
 
   instance Eq a => Weedable (SwitchClause a) where

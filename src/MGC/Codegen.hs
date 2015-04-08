@@ -33,7 +33,7 @@ module MGC.Codegen where
     , blockCount   :: Int                      -- Count of basic blocks
     , count        :: Word                     -- Count of unnamed instructions
     , names        :: Map.Map String Int       -- Redeclarations of name
-    , types        :: [S.TypeSpec]             -- type declarations to propagate upwards
+    , types        :: [S.TypeSpec CK.Ann]      -- type declarations to propagate upwards
     , nextBlock    :: Maybe Name               -- Block to Fallthrough to in switches
     } deriving Show
 

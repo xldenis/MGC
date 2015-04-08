@@ -49,7 +49,8 @@ codegenTop (FunctionDecl nm sig body) = do
         assign a var
       codegenStmt body
 codegenTop (Decl (TypeDecl ts)) = do
-  mapM (\(TypeSpec n t) -> typedef (AST.Name n) (lltype t)) ts
+  mapM (\(TypeSpec a n t) -> case truety a of
+    TypeName n -> typedef (AST.Name n) (lltype t)) ts
   return ()
 --codegenTop (Decl VarDecl)
 --codegenTop (Decl TypeDecl)
@@ -163,7 +164,7 @@ codegenStmt (Switch s exp clauses) = do
   test <- case exp of
     Just x -> do{cond <- codegenExpr x; return $ \n -> codegenExpr n >>= (eq (truety $ annOf x) cond)}
     Nothing -> return $ codegenExpr
-    
+
   prevState <- gets nextBlock
   mapM (\(((h,b), c):((next,nextBody), _):[]) -> do
       setBlock h
@@ -206,15 +207,15 @@ codegenCond (Just (Condition e)) = codegenExpr e
 codegenCond Nothing = return true
 
 codegenSpec :: VarSpec Ann -> Codegen ()
-codegenSpec (VarSpec idens [] (Just tp)) = do
+codegenSpec (VarSpec a idens [] (Just tp)) = do
   mapM (\n -> do
     i <- case tp of 
       Slice t -> call llsliceptr (externf llnewslice (AST.Name "new_slice")) [llint 10, llint 10, llint 1]
         where sltp = (lltype $ TypeName "slice")
-      _ -> alloca $ lltype tp
+      _ -> alloca $ lltype $ truety a
 
     assign (AST.Name n) i) idens >> return ()
-codegenSpec (VarSpec idens exps _) = do
+codegenSpec (VarSpec _ idens exps _) = do
   mapM (\(n, e) -> do
     let tp = (lltype $ ttOf e)
     i   <- alloca tp
