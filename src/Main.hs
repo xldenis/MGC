@@ -8,11 +8,12 @@ import System.Environment (withArgs, getArgs)
 import MGC.Syntax.Pretty
 import MGC.Check
 import MGC.Syntax.Weeder (runWeeder)
+import MGC.Emit (emit)
 
 import Control.Applicative ((<$>), (<*))
-import Control.Monad (liftM)
+import Control.Monad (liftM, when)
 
-data Options = Options {astPrint :: Bool, files :: [String], test :: Bool, dumpsymtab :: Bool, pptype :: Bool } deriving (Show, Data, Typeable)
+data Options = Options {astPrint :: Bool, files :: [String], test :: Bool, dumpsymtab :: Bool, pptype :: Bool, fmt :: Bool } deriving (Show, Data, Typeable)
 
 
 opts = Options{
@@ -20,6 +21,7 @@ opts = Options{
   test = False &= help "Test directories", 
   dumpsymtab = False &= help "Print current scope on exit",
   pptype = False &= help "Print type information in output",
+  fmt = False &= help "Format go code in .pretty.go",
   files = [] &= args 
 }
 
@@ -40,25 +42,21 @@ realMain = do
 
 compile :: String -> Options -> IO ()
 compile fname args = do
-  ast <- (parse (package <* eof) "") <$> readFile (fname)
-  case ast of 
-    Left a -> putStrLn $ show a
-    Right ast -> case runWeeder ast of 
-      Left err -> putStrLn $ show err
-      Right ast -> do
-        case (typecheck ast) of
-          (Left err, (l,_,_)) -> do
-            putStrLn $ show err ++ "\n" ++  l
-            if (dumpsymtab args) then saveFile fname "symtab" l else return ()
-          (Right typedAst, (l,_,_)) -> do
-            if astPrint args
-            then putStrLn $ show typedAst
-            else return ()
-            putStrLn l
-            putStrLn $ prettyShow $ pretty typedAst
-            if (dumpsymtab args) then saveFile fname "symtab" l else return ()
-            if (pptype args) then saveFile fname "pptype.go" (prettyShow $ pretty typedAst) else return ()
-            saveFile fname "pretty.go" $ prettyShow $ pretty ast
+  ast <- liftM (\s -> parseProgram s >>= runWeeder) $ readFile (fname)
+  case ast of
+    Left err -> putStrLn $ show err
+    Right ast -> do
+      case (typecheck ast) of
+        (Left err, (l,_,_)) -> do
+          putStrLn $ show err ++ "\n" ++  l
+          when (dumpsymtab args) $ saveFile fname "symtab" l
+        (Right typedAst, (l,_,_)) -> do
+          when (astPrint args) $ putStrLn $ show typedAst
+          when (dumpsymtab args) $ saveFile fname "symtab" l
+          when (pptype args) $ saveFile fname "pptype.go" (prettyShow $ pretty typedAst)
+          when (fmt args) $ saveFile fname "pretty.go" $ prettyShow $ pretty ast
+          emit typedAst (dropExtension fname)
+
 
 saveFile :: String -> String -> String -> IO ()
 saveFile f e d = writeFile (replaceExtension f e) d

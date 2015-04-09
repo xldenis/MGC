@@ -1,39 +1,24 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 module MGC.Syntax.Weeder where
   import MGC.Syntax
+  import MGC.Error (WeederError(..), MGCError(..), transLeft)
   import Control.Applicative ((<$>), (<*>), (<*))
   import Control.Monad.Except
   import Control.Monad.State
 
-
   type Weed = ExceptT WeederError (State WeederState)
 
-
-  runWeeder :: Weedable a => a -> Either WeederError a
-  runWeeder = fst. flip runState (empty) . runExceptT . weed
+  runWeeder :: Weedable a => a -> Either MGCError a
+  runWeeder = transLeft (Weeder) . fst . flip runState (empty) . runExceptT . weed
 
   runWeeder' :: Weedable a => a -> (Either WeederError a, WeederState)
   runWeeder' = flip runState (empty) . runExceptT . weed
+
   class Weedable a where
     weed ::  a -> Weed a
     weed = return
     weedList :: [a] -> Weed [a]
     weedList = mapM (weed)
-
-  data WeederError 
-    = MultipleDefault
-    | EmptyFuncBody
-    | InvalidTopLevelDecl
-    | InvalidPackageName
-    | InvalidContinue
-    | AssignSizeDifferent
-    | BlankValue
-    | InvalidBreak
-    | InvalidArraySize
-    | InvalidLValue
-    | InvalidFallthrough
-    | MissingReturn
-    | MultipleReturnValue deriving Show
 
   data WeederState = State{lhs :: Bool, func :: Bool, funcReturn :: Bool, loop :: Bool, branchRet :: Bool} deriving Show
 

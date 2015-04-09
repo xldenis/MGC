@@ -28,7 +28,7 @@ module MGC.Syntax where
    | QualName Identifier Identifier
    | Integer Int  
    | Rune String
-   | Float Float
+   | Float Double
    | IntString String 
    | Bool Bool
    | RawString String deriving (Show, Eq, Typeable, Data)
@@ -83,6 +83,8 @@ module MGC.Syntax where
     | TRune
     | TNil
     | TBool deriving (Show, Eq, Typeable, Data)
+
+  data Ann = Ann{ ty :: Type, truety :: Type} deriving (Show, Typeable, Data)
 
   data FieldDecl  
     = NamedField [Identifier] Type (Maybe String) 

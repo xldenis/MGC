@@ -3,7 +3,6 @@
 module MGC.Syntax.Pretty where
   --import Text.PrettyPrint.HughesPJClass
   import MGC.Syntax
-  import MGC.Check (Ann(..))
   import Data.List (intercalate, intersperse)
 
   import MGC.Parser.Expression (binaryOps, unaryOps)
@@ -107,7 +106,7 @@ module MGC.Syntax.Pretty where
   annotate :: Pretty a => a -> Doc
   annotate = comment . pretty 
 
-  float :: Float -> Doc
+  float :: Double -> Doc
   float f = Doc 0 (show f)
 
   int :: Int -> Doc

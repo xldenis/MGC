@@ -3,39 +3,13 @@
 module MGC.Check where
   import qualified Data.Map as M
   import Data.Map (Map)
-  import Data.Data (Data, Typeable)
+  import MGC.Error (TypeError(..), MGCError(..), transLeft)
   import MGC.Syntax
-
   import Data.Maybe (listToMaybe, mapMaybe)
   import Control.Monad.State
   import Control.Monad.Except
   import Control.Applicative ((<$>), (<*>))
 
-  data TypeError 
-    = TypeError String
-    | ImpossibleError String
-    | InvalidAppend
-    | InvalidCase [Expression Ann] Type
-    | InvalidCast Type Type
-    | InvalidCondition (Expression Ann)
-    | InvalidFuncCall
-    | InvalidIncDec (Expression Ann) Type
-    | InvalidIndex Type Type
-    | InvalidOpType BinOp (Expression Ann) (Expression Ann)
-    | InvalidPrint
-    | InvalidReturn
-    | InvalidFor
-    | InvalidUOp UOp (Expression Ann)
-    | InvalidVarDec Type [Expression Ann] 
-    | Mismatch Type Type 
-    | MissingField Type Identifier
-    | NoNewVars
-    | NotInScope String
-    | RedeclaredType String
-    | MissingMain
-    | RedeclaredVar String deriving Show
-
-  data Ann = Ann{ ty :: Type, truety :: Type} deriving (Show, Typeable, Data)
   ann t = Ann{ty = t, truety = t}
 
   type Env = [Map String Ann]
@@ -261,8 +235,6 @@ module MGC.Check where
       a <- alias tp
       t <- rawType tp
       return $ Index (Ann{ ty = a, truety = t}) lh idx
-    --check (SimpleSlice () l b t)
-    --check (FullSlice () l b d t)
     check (Arguments () (Name () "println") a) = do
       a' <- checkList a
       at <- mapM (rawType . typeOf) a'
@@ -312,10 +284,10 @@ module MGC.Check where
   funcTypes :: [Parameter] -> [Type]
   funcTypes = concat . map (\(Parameter idens typ) -> replicate (if (length idens) == 0 then 1 else (length idens)) typ)
 
-  runCheck :: String -> Env -> Check a -> (Either TypeError a, (String, Counters, Env))
-  runCheck s f = flip runState (s, C{ret = TNil,typCnt = 0}, f) . runExceptT
+  runCheck :: String -> Env -> Check a -> (Either MGCError a, (String, Counters, Env))
+  runCheck s f =  flip runState (s, C{ret = TNil,typCnt = 0}, f) . liftM (transLeft Typechecker) . runExceptT
 
-  typecheck :: Checkable a => (a ()) -> (Either TypeError (a Ann), (String, Counters, Env))
+  typecheck :: Checkable a => (a ()) -> (Either MGCError (a Ann), (String, Counters, Env))
   typecheck = runCheck "" [] . check
 
   add f e n t = do

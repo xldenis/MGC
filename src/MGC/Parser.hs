@@ -4,8 +4,8 @@ module MGC.Parser where
   import MGC.Parser.Expression
   import MGC.Parser.Type
   import MGC.Parser.Prim
-
-  import Text.Parsec (try, many)
+  import MGC.Error (MGCError(..), transLeft)
+  import Text.Parsec (try, many, parse)
   import Text.Parsec.String
   import Text.Parsec.Char
   import Text.Parsec.Combinator
@@ -23,8 +23,10 @@ module MGC.Parser where
       Just op' -> return op'
       _ -> fail "Invalid AddOp"
 
-  package :: Parser (Package ())
+  parseProgram :: String -> Either MGCError (Package ())
+  parseProgram = transLeft (Parser) . (parse (package <* eof) "")
 
+  package :: Parser (Package ())
   package = do
     fullSpace
     reserved "package"

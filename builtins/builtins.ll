@@ -7,7 +7,7 @@
 %slice = type {
   i32, ;; cur len
   i32, ;; max cap
-  i32, ;; elm len
+  i32, ;; typ len
   i8*  ;; data
 }
 
@@ -25,11 +25,11 @@ define fastcc %slice* @new_slice(i32 %length, i32 %capacity, i32 %tylen) nounwin
   %elsize = mul i32 %capacity, %tylen
   %ptr = call i8* @malloc(i32 %elsize)
 
+  %curszptr = getelementptr %slice* %res, i32 0, i32 0
+  store i32 %length, i32* %curszptr
+
   %sizeptr = getelementptr %slice* %res, i32 0, i32 1
   store i32 %capacity, i32* %sizeptr
-
-  %curszptr = getelementptr %slice* %res, i32 0, i32 1
-  store i32 %length, i32* %curszptr
 
   %elszptr  = getelementptr %slice* %res, i32 0, i32 2
   store i32 %tylen, i32* %elszptr
@@ -98,26 +98,32 @@ define fastcc i32 @copy(%slice* %dst, %slice* %src) {
   %dbuf = load i8** %4
   %sbuf = load i8** %5
 
-  call i8* @memcpy(i8* %dbuf, i8* %sbuf, i32 %mlen)
+  %6 = getelementptr %slice* %dst, i32 0, i32 2
+  %tylen = load i32* %6
+
+  %7 = mul i32 %mlen, %tylen
+
+  call i8* @memcpy(i8* %dbuf, i8* %sbuf, i32 %7)
 
   ret i32 %mlen
 }
  
 define fastcc %slice* @append(%slice* %this, i8* %el) {
-  %1 = getelementptr %slice* %this, i32 0, i32 1
-  %cap = load i32* %1
+  %1   = getelementptr %slice* %this, i32 0, i32 0
+  %len = load i32* %1
 
-  %2 = getelementptr %slice* %this, i32 0, i32 0
-  %len = load i32* %2
+  %2   = getelementptr %slice* %this, i32 0, i32 1
+  %cap = load i32* %2
 
-  %3 = sub i32 %cap, %len
+  %3 = sub i32 %cap, %len ; space left in slice
   %4 = icmp ne i32 %3, 0
-  %ncap = mul i32 %cap, 2
-  %ocap = select i1 %4, i32 %cap, i32 %ncap
+  %ncap = mul i32 %cap, 2 ; new cap
+  %ocap = select i1 %4, i32 %cap, i32 %ncap ; if we need to, grow
 
   %5 = getelementptr %slice* %this, i32 0, i32 2
   %elsz = load i32* %5
-  %ret = call %slice* @new_slice(i32 %len, i32 %ncap, i32 %elsz)
+  %newlen = add i32 %len, 1
+  %ret = call %slice* @new_slice(i32 %newlen, i32 %ncap, i32 %elsz)
 
   call i32 @copy(%slice* %ret, %slice* %this)
 
@@ -165,7 +171,7 @@ define %slice* @add_string(%slice* %a, %slice* %b) {
 
 declare void @putchar(i8)
 
-define void @println(%slice* %this) {
+define void @print.string(%slice* %this) {
   %1 = getelementptr %slice* %this, i32 0, i32 0
   %len = load i32* %1
 
@@ -195,7 +201,19 @@ define void @println(%slice* %this) {
   ret void
 }
 
-define void @print(%slice*   %this) {
+define void @print.slice(%slice*   %this) {
 
+  ret void
+}
+
+define void @print.int(i64 %this) {
+  ret void
+}
+
+define void @print.float(double %this) {
+  ret void
+}
+
+define void @print.struct(i8* %this) {
   ret void
 }

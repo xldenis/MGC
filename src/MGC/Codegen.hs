@@ -25,6 +25,8 @@ module MGC.Codegen where
   import qualified MGC.Syntax as S
   import qualified MGC.Check  as CK
 
+  -- Codegen Data Types
+
   data CodegenState
     = CodegenState {
       currentBlock :: Name                     -- Name of the active block to append to
@@ -33,8 +35,9 @@ module MGC.Codegen where
     , blockCount   :: Int                      -- Count of basic blocks
     , count        :: Word                     -- Count of unnamed instructions
     , names        :: Map.Map String Int       -- Redeclarations of name
-    , types        :: [S.TypeSpec CK.Ann]      -- type declarations to propagate upwards
+    , types        :: [S.TypeSpec S.Ann]       -- type declarations to propagate upwards
     , nextBlock    :: Maybe Name               -- Block to Fallthrough to in switches
+    , loopBlock    :: Maybe (Name, Name)       -- Blocks to jump to in loop
     } deriving Show
 
   data BlockState
@@ -118,7 +121,7 @@ module MGC.Codegen where
   entryBlockName = "entry"
 
   emptyCodegen :: CodegenState
-  emptyCodegen = CodegenState (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty [] Nothing
+  emptyCodegen = CodegenState (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty [] Nothing Nothing
 
   createBlocks :: CodegenState -> [BasicBlock]
   createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
@@ -213,7 +216,7 @@ module MGC.Codegen where
   call tp fn args = instr tp $ Call False CC.C [] (Right fn) (toArgs args) [] []
 
   alloca :: Type -> Codegen Operand
-  alloca ty = instr ty $ Alloca ty Nothing 0 []
+  alloca ty = instr (ptr ty) $ Alloca ty Nothing 0 []
 
   store :: Type -> Operand -> Operand -> Codegen Operand
   store tp ptr val = instr tp $ Store False ptr val Nothing 0 []
@@ -253,10 +256,14 @@ module MGC.Codegen where
     [] -> T.void
     _  -> lltype (head tps)
   lltype (S.Array l tp) = T.ArrayType (fromIntegral l) (lltype tp)
+  lltype (S.Function s) = T.FunctionType (retty s) (argty s) False
+    where retty (S.Signature _ ret) =  (\(S.Parameter _ t) -> lltype t) $ head ret
+          argty (S.Signature arg _) = concatMap (\(S.Parameter ids t) -> map (\i -> lltype t) ids) arg
   lltype (S.TypeName n) = T.NamedTypeReference (Name n)
   lltype (S.Slice tp)   = T.NamedTypeReference (Name "slice")
   lltype (S.TString )   = T.NamedTypeReference (Name "slice")
-
+  lltype (S.TNil)       = T.void
+  lltype (S.TBool)      = T.i1
   ptr :: Type -> Type
   ptr t = T.PointerType t (AS.AddrSpace 0)
 
@@ -294,19 +301,19 @@ module MGC.Codegen where
   add tp a b = case tp of
     S.TInteger -> instr int $ Add False False a b []
     S.TFloat   -> instr double $ FAdd NoFastMathFlags a b []
-    _ -> error $ "impossible"
+    _ -> error $ "Cannot generate code for +"
 
   sub :: S.Type -> Operand -> Operand -> Codegen Operand
   sub tp a b = case tp of
     S.TInteger -> instr int $ Sub False False a b []
     S.TFloat   -> instr double $ FSub NoFastMathFlags a b []
-    _ -> error $ "impossible"
+    _ -> error $ "Cannot generate code for -"
 
   mul :: S.Type -> Operand -> Operand -> Codegen Operand
   mul tp a b = case tp of
     S.TInteger -> imul int a b
     S.TFloat   -> instr double $ FMul NoFastMathFlags a b []
-    _ -> error $ "impossible"
+    _ -> error $ "Cannot generate code for *"
 
   imul :: Type -> Operand -> Operand -> Codegen Operand
   imul t a b = instr t $ Mul False False a b []
@@ -315,7 +322,7 @@ module MGC.Codegen where
   div tp a b = case tp of
     S.TInteger -> instr int $ Add False False a b []
     S.TFloat   -> instr double $ FDiv NoFastMathFlags a b []
-    _ -> error $ "impossible"
+    _ -> error $ "Cannot generate code for /"
 
   mod :: Operand -> Operand -> Codegen Operand
   mod a b = instr int $ SRem a b []
@@ -353,32 +360,32 @@ module MGC.Codegen where
   eq :: S.Type -> Operand -> Operand -> Codegen Operand
   eq S.TInteger = icmp IP.EQ 
   eq S.TFloat   = fcmp FP.OEQ
-  eq _          = error $ "impossible"
+  eq _          = error $ "Cannot generate code for =="
 
   neq :: S.Type -> Operand -> Operand -> Codegen Operand
   neq S.TInteger = icmp IP.EQ
   neq S.TFloat   = fcmp FP.OEQ
-  neq _          = error $ "impossible"
+  neq _          = error $ "Cannot generate code for !="
 
   gt :: S.Type -> Operand -> Operand -> Codegen Operand
   gt S.TInteger = icmp IP.SGT
   gt S.TFloat   = fcmp FP.OGT
-  gt _          = error $ "impossible"
+  gt _          = error $ "Cannot generate code for >"
 
   lt :: S.Type -> Operand -> Operand -> Codegen Operand
   lt S.TInteger = icmp IP.SLT
   lt S.TFloat   = fcmp FP.OLT
-  lt _          = error $ "impossible"
+  lt _          = error $ "Cannot generate code for <"
 
   geq :: S.Type -> Operand -> Operand -> Codegen Operand
   geq S.TInteger = icmp IP.SGT
   geq S.TFloat   = fcmp FP.OGE
-  geq _          = error $ "impossible"
+  geq _          = error $ "Cannot generate code for >="
 
   leq :: S.Type -> Operand -> Operand -> Codegen Operand
   leq S.TInteger = icmp IP.SLE
   leq S.TFloat   = fcmp FP.OLE
-  leq _          = error $ "impossible"
+  leq _          = error $ "Cannot generate code for <="
 
   sitofp :: Operand -> Codegen Operand
   sitofp a = instr double $ SIToFP a int []
