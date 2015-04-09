@@ -201,9 +201,16 @@ codegenStmt Fallthrough = do
   case blk of -- because of weeding this is the only possible case
     Just b -> br b
   return ()
-
--- Break
--- Continue -- need to keep track of loops 
+codegenStmt Break = do
+  loop <- gets loopBlock
+  case loop of
+    Just (start, end) -> br end
+  return ()
+codegenStmt Continue = do
+  loop <- gets loopBlock
+  case loop of
+    Just (start, end) -> br start
+  return ()
 
 windowed ls = 
     (case ls of 
