@@ -15,7 +15,7 @@ declare i8* @malloc(i32)
 declare void @free(i8*)
 declare i8* @memcpy(i8*, i8*, i32)
 
-define fastcc %slice* @new_slice(i32 %length, i32 %capacity, i32 %tylen) nounwind {
+define %slice* @new_slice(i32 %length, i32 %capacity, i32 %tylen) nounwind {
   %base = getelementptr %slice* null, i32 1, i32 0
   %hsize = ptrtoint i32* %base to i32
   
@@ -40,14 +40,14 @@ define fastcc %slice* @new_slice(i32 %length, i32 %capacity, i32 %tylen) nounwin
   ret %slice* %res
 }
 
-define fastcc void @del_slice(%slice* %this) nounwind {
+define void @del_slice(%slice* %this) nounwind {
 
   ;; Deallocation is for people who can't scale
 
   ret void
 }
 
-define fastcc void @resize(%slice* %this, i32 %len) {
+define void @resize(%slice* %this, i32 %len) {
   %1 = getelementptr %slice* %this, i32 0, i32 1
   %cap = load i32* %1
   %rsz = icmp sgt i32 %cap, %len
@@ -82,7 +82,7 @@ define fastcc void @resize(%slice* %this, i32 %len) {
   ret void
 }
 
-define fastcc i32 @copy(%slice* %dst, %slice* %src) {
+define i32 @copy(%slice* %dst, %slice* %src) {
   %1 = getelementptr %slice* %dst, i32 0, i32 0
   %2 = getelementptr %slice* %src, i32 0, i32 0
 
@@ -108,7 +108,7 @@ define fastcc i32 @copy(%slice* %dst, %slice* %src) {
   ret i32 %mlen
 }
  
-define fastcc %slice* @append(%slice* %this, i8* %el) {
+define %slice* @append(%slice* %this, i8* %el) {
   %1   = getelementptr %slice* %this, i32 0, i32 0
   %len = load i32* %1
 
@@ -159,19 +159,34 @@ define %slice* @add_string(%slice* %a, %slice* %b) {
   %5 = load i8** %3
   %6 = load i8** %4
 
-  %7 = getelementptr i8* %6, i32 %alen
 
-  %8 = getelementptr %slice* %ret, i32 0, i32 3
-  %9 = load i8** %8
-  call i8* @memcpy(i8* %9, i8* %5, i32 %alen)
-  call i8* @memcpy(i8* %9, i8* %7, i32 %blen)
+  %7 = getelementptr %slice* %ret, i32 0, i32 3
+  %8 = load i8** %7
+
+  %9 = getelementptr i8* %8, i32 %alen
+
+  call i8* @memcpy(i8* %8, i8* %5, i32 %alen)
+  call i8* @memcpy(i8* %9, i8* %6, i32 %blen)
 
   ret %slice* %ret
 }
 
+define %slice* @string_constant(i8* %cons, i32 %len) {
+  %str = call %slice* @new_slice(i32 %len, i32 %len, i32 1)
+  %bufptr = getelementptr %slice* %str, i32 0, i32 3
+  store i8* %cons, i8** %bufptr
+
+  ret %slice* %str
+}
+
+;;-----------------------------------------------
+;; PRINT FUNCTIONS
+;;-----------------------------------------------
+
+
 declare void @putchar(i8)
 
-define void @print.string(%slice* %this) {
+define void @print.tstring(%slice* %this) {
   %1 = getelementptr %slice* %this, i32 0, i32 0
   %len = load i32* %1
 
@@ -201,19 +216,30 @@ define void @print.string(%slice* %this) {
   ret void
 }
 
+define void @print.trune (i8 %this) {
+  call void @putchar(i8 %this)
+  ret void
+}
+
+@.fmtf = private unnamed_addr constant [3 x i8] c"%f\00"
+@.fmti = private unnamed_addr constant [3 x i8] c "%d\00"
+@.fmtslice = private unnamed_addr constant [14 x i8] c"[%d/%d](%d)%p\00"
+@.fmtstruct = private unnamed_addr constant [3 x i8] c"%p\00"
+
+declare i32 @printf(i8* noalias nocapture, ...)
+
+; Function Attrs: nounwind readnone
+define void @print.float(double %this) #1 {
+  %call = call i32 (i8*, ...)* @printf(i8* getelementptr inbounds ([3 x i8]* @.fmtf, i32 0, i32 0), double %this)
+  ret void
+}
+
 define void @print.slice(%slice*   %this) {
 
   ret void
 }
 
-define void @print.int(i64 %this) {
-  ret void
-}
-
-define void @print.float(double %this) {
-  ret void
-}
-
-define void @print.struct(i8* %this) {
+define void @print.tinteger(i64 %this) {
+  %call = call i32 (i8*, ...)* @printf(i8* getelementptr inbounds ([3 x i8]* @.fmti, i32 0, i32 0), i64  %this)
   ret void
 }

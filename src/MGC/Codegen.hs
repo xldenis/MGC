@@ -12,7 +12,7 @@ module MGC.Codegen where
   import Control.Applicative (Applicative)
 
   import LLVM.General.AST
-  import LLVM.General.AST.Global
+  import LLVM.General.AST.Global as G
 
   import qualified LLVM.General.AST.AddrSpace as AS
   import qualified LLVM.General.AST.CallingConvention as CC
@@ -21,6 +21,7 @@ module MGC.Codegen where
   import qualified LLVM.General.AST.FloatingPointPredicate as FP
   import qualified LLVM.General.AST.IntegerPredicate as IP
   import qualified LLVM.General.AST.Type as T
+  import qualified LLVM.General.AST.Linkage as L
 
   import qualified MGC.Syntax as S
   import qualified MGC.Check  as CK
@@ -35,7 +36,9 @@ module MGC.Codegen where
     , blockCount   :: Int                      -- Count of basic blocks
     , count        :: Word                     -- Count of unnamed instructions
     , names        :: Map.Map String Int       -- Redeclarations of name
-    , types        :: [S.TypeSpec S.Ann]       -- type declarations to propagate upwards
+    , types        :: [S.TypeSpec S.Ann]       -- Type declarations to propagate upwards
+    , constants    :: [(Name, Type, C.Constant)] -- Constants to propagate up
+    , consOffset   :: Int                      -- Base constant number
     , nextBlock    :: Maybe Name               -- Block to Fallthrough to in switches
     , loopBlock    :: Maybe (Name, Name)       -- Blocks to jump to in loop
     } deriving Show
@@ -64,10 +67,11 @@ module MGC.Codegen where
     defs <- gets moduleDefinitions
     modify $ \s -> s { moduleDefinitions = defs ++ [d] }
 
-  define :: Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
-  define retty label argtys body = addDefn $
+  define :: Type -> String -> [(Type, Name)] -> L.Linkage -> [BasicBlock] -> LLVM ()
+  define retty label argtys linkage body = addDefn $
     GlobalDefinition $ functionDefaults {
     name = Name label
+    , linkage    =  linkage
     , parameters = ([Parameter ty nm [] | (ty, nm) <- argtys], False)
     , returnType = retty
     , basicBlocks = body
@@ -82,6 +86,15 @@ module MGC.Codegen where
     , basicBlocks = []
     }
 
+  constant :: Name -> Type -> C.Constant -> LLVM ()
+  constant nm tp cons =  addDefn $ 
+    GlobalDefinition $ globalVariableDefaults {
+    name = nm
+    , G.type' = tp
+    , isConstant = True
+    , initializer = Just cons
+
+    }
   typedef :: Name -> Type -> LLVM ()
   typedef nm tp = addDefn $ TypeDefinition nm (Just tp)
 
@@ -111,6 +124,12 @@ module MGC.Codegen where
       Just x -> return x
       Nothing -> error $ "not possible" -- refactor
 
+  addConstant :: Type -> C.Constant -> Codegen Name
+  addConstant tp c = do
+    i <- gets consOffset
+    modify $ \s -> s { consOffset = 1 + i, constants = (name i, tp, c) : (constants s)}
+    return $ name i
+    where name a =  Name $ "cons." ++ (show a)
   entry :: Codegen Name
   entry = gets currentBlock
 
@@ -121,7 +140,7 @@ module MGC.Codegen where
   entryBlockName = "entry"
 
   emptyCodegen :: CodegenState
-  emptyCodegen = CodegenState (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty [] Nothing Nothing
+  emptyCodegen = CodegenState (Name entryBlockName) Map.empty Map.empty 1 0 Map.empty [] [] 0 Nothing Nothing
 
   createBlocks :: CodegenState -> [BasicBlock]
   createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
@@ -301,6 +320,8 @@ module MGC.Codegen where
   add tp a b = case tp of
     S.TInteger -> instr int $ Add False False a b []
     S.TFloat   -> instr double $ FAdd NoFastMathFlags a b []
+    S.TString  -> call llsliceptr (externf stringadd (Name "add_string")) [a, b]
+      where stringadd = T.FunctionType llsliceptr [llsliceptr, llsliceptr] False
     _ -> error $ "Cannot generate code for +"
 
   sub :: S.Type -> Operand -> Operand -> Codegen Operand
@@ -320,7 +341,7 @@ module MGC.Codegen where
 
   div :: S.Type -> Operand -> Operand -> Codegen Operand
   div tp a b = case tp of
-    S.TInteger -> instr int $ Add False False a b []
+    S.TInteger -> instr int $ SDiv False a b []
     S.TFloat   -> instr double $ FDiv NoFastMathFlags a b []
     _ -> error $ "Cannot generate code for /"
 

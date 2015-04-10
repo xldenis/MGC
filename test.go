@@ -1,6 +1,7 @@
-package test
+package main
 
-func x(y int) int {
-  var x string = "s" + "a"
-  return 1;
+func main() int {
+  var x string = "test\n"
+  println("t" + "e" + "s" + "t")
+  return 1
 }

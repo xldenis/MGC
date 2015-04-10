@@ -4,9 +4,11 @@ import Prelude hiding (mod, div, not)
 import Control.Monad
 import Control.Monad.State (modify, gets)
 import Control.Monad.Except
-import Data.List (findIndex, sortBy)
+import Data.List (findIndex, sortBy, intersperse)
 import Data.Ord  (Ordering(..))
 import Data.Either (rights)
+import Data.Data (toConstr)
+import Data.Char (toLower, ord)
 
 import MGC.Syntax as S
 import MGC.Check (typeOf, annOf, ttOf)
@@ -17,6 +19,8 @@ import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST as AST
 import qualified LLVM.General.AST.Type as T
 import qualified LLVM.General.Target as TM
+import qualified LLVM.General.AST.Linkage as L
+
 
 import LLVM.General.PrettyPrint
 import LLVM.General.PassManager
@@ -27,17 +31,25 @@ codegenPkg :: Package Ann -> LLVM ()
 codegenPkg (Package nm tlds) = do
   modify (\s -> s {AST.moduleName = nm})
   typedef (AST.Name "slice") llslice
-  define (llsliceptr) "append"    [(llsliceptr, AST.UnName 0), (ptr $ char, AST.UnName 0)] []
-  define (llsliceptr) "new_slice" [(T.i32, AST.UnName 0), (T.i32, AST.UnName 0) , (T.i32, AST.UnName 0)] []
+  define (llsliceptr) "append"    [(llsliceptr, AST.UnName 0), (ptr $ char, AST.UnName 0)] L.External []
+  define (llsliceptr) "new_slice" [(T.i32, AST.UnName 0), (T.i32, AST.UnName 0) , (T.i32, AST.UnName 0)] L.External []
+  define (llsliceptr) "string_constant" [(ptr $ char, AST.UnName 0), (T.i32, AST.UnName 0)] L.External []
+  define (llsliceptr) "add_string" [(llsliceptr, AST.UnName 0), (llsliceptr, AST.UnName 0)] L.External []
+
+  define (T.void) "print.tinteger" [(T.i64, AST.UnName 0)] L.External []
+  define (T.void) "print.tstring" [(llsliceptr, AST.UnName 0)] L.External []
+  define (T.void) "print.trune" [(T.i8, AST.UnName 0)] L.External []
   mapM codegenTop tlds
   return ()
 
 codegenTop :: TopLevelDeclaration Ann -> LLVM ()
-codegenTop (FunctionDecl nm sig Empty) = define (lltype $ retty sig) nm (argty sig) []
+codegenTop (FunctionDecl nm sig Empty) = define (lltype $ retty sig) nm (argty sig) L.External []
 codegenTop (FunctionDecl nm sig body) = do
   codegenTop (Decl (TypeDecl $ types cg))
-  define (lltype $ retty  sig) nm largs blks
+  mapM (\(nm, tp, cons) -> constant nm tp cons ) $ constants cg
+  define (lltype $ retty  sig) nm largs linkage blks
   where
+    linkage = if nm == "main" then L.External else L.Internal
     largs = argty sig
     blks  = createBlocks $ cg
     cg    = execCodegen $ do
@@ -48,6 +60,7 @@ codegenTop (FunctionDecl nm sig body) = do
         store atp var (local atp a)
         assign a var
       codegenStmt body
+      retvoid
 codegenTop (Decl (TypeDecl ts)) = do
   mapM (\(TypeSpec a n t) -> case truety a of
     TypeName n -> case t of
@@ -99,7 +112,7 @@ codegenStmt (For (Just (ForClause s e p)) body) = do
 
   codegenStmt s
   prev <- gets loopBlock
-  modify (\s -> s {loopBlock = Just (loopstart, loopbody)})
+  modify (\s -> s {loopBlock = Just (loopstart, loopend)})
   br loopstart
   setBlock loopstart
   test <- case e of
@@ -119,11 +132,13 @@ codegenStmt (For cond body) = do
   loopbody <- addBlock "for.body"
   loopend <- addBlock "for.end"
   prev <- gets loopBlock
-  modify (\s -> s {loopBlock = Just (loopstart, loopbody)})
+  modify (\s -> s {loopBlock = Just (loopstart, loopend)})
   -- init vars
   br loopstart
   setBlock loopstart
-  test <- codegenCond cond
+  test <- case cond of
+    Nothing -> return true
+    Just (Condition e) -> codegenExpr e
   cbr test loopbody loopend
 
   setBlock loopbody
@@ -139,12 +154,18 @@ codegenStmt (ShortDecl idens exps) = do
   mapM (\(n, e) -> do
     let tp = lltype $ ttOf e
     i <- alloca tp
-    val <- codegenExpr e
+    val <- case ttOf e of
+      Slice _ -> codegenExpr e >>= load llslice
+      TString -> codegenExpr e >>= load llslice
+      _       -> codegenExpr e 
     store tp i val
     assign (AST.Name n) i) (zip idens exps) >> return ()
 codegenStmt (Assignment Eq lh rh) = do
   lhs <- mapM getaddr lh
-  rhs <- mapM codegenExpr rh
+  rhs <- mapM (\e -> case ttOf e of
+      Slice _ -> codegenExpr e >>= load llslice
+      TString -> codegenExpr e >>= load llslice
+      _       -> codegenExpr e) rh
   let lt = map ttOf lh
   mapM (\(t,l,r) -> store (lltype $ t) l r) $ zip3 lt lhs rhs
   return ()
@@ -170,12 +191,10 @@ codegenStmt (Switch s exp clauses) = do
     return (head, body) 
     ) cases
   end <- addBlock "switch.end"
-
   br (fst . head $ blocks)
   test <- case exp of
     Just x -> do{cond <- codegenExpr x; return $ \n -> codegenExpr n >>= (eq (truety $ annOf x) cond)}
     Nothing -> return $ codegenExpr
-
   prevState <- gets nextBlock
   mapM (\(((h,b), c):((next,nextBody), _):[]) -> do
       setBlock h
@@ -194,7 +213,6 @@ codegenStmt (Switch s exp clauses) = do
     ) $ windowed $ (zip blocks cases)++[((end,end),(head cases))]
   modify (\s -> s {nextBlock = prevState})
   setBlock end
-
   return ()
 codegenStmt Fallthrough = do
   blk <- gets nextBlock
@@ -212,23 +230,13 @@ codegenStmt Continue = do
     Just (start, end) -> br start
   return ()
 
-windowed ls = 
-    (case ls of 
-      [] -> []
-      x:xs -> 
-        if length ls >= 2 then 
-          (take 2 ls) : windowed xs
-        else windowed xs)
-
-codegenCond :: Maybe (ForCond Ann) -> Codegen AST.Operand
-codegenCond (Just (Condition e)) = codegenExpr e
-codegenCond Nothing = return true
-
 codegenSpec :: VarSpec Ann -> Codegen ()
 codegenSpec (VarSpec a idens [] (Just tp)) = do
   mapM (\n -> do
-    i <- case tp of 
+    i <- case truety a of 
       Slice t -> call llsliceptr (externf llnewslice (AST.Name "new_slice")) [llint 0, llint 10, llint 1]
+        where sltp = (lltype $ TypeName "slice")
+      TString -> call llsliceptr (externf llnewslice (AST.Name "new_slice")) [llint 0, llint 10, llint 1]
         where sltp = (lltype $ TypeName "slice")
       _ -> alloca $ lltype $ truety a
 
@@ -237,11 +245,12 @@ codegenSpec (VarSpec _ idens exps _) = do
   mapM (\(n, e) -> do
     let tp = (lltype $ ttOf e)
     i   <- alloca tp
-    val <- codegenExpr e
+    val <- case ttOf e of
+      Slice _ -> codegenExpr e >>= load llslice
+      TString -> codegenExpr e >>= load llslice
+      _       -> codegenExpr e 
     store tp i val
     assign (AST.Name n) i) (zip idens exps) >> return ()
-
-llint i = cons $ C.Int 32 (toInteger i)
 
 codegenExpr :: Expression Ann -> Codegen AST.Operand
 codegenExpr (BinaryOp tp op a b) = do
@@ -251,9 +260,6 @@ codegenExpr (BinaryOp tp op a b) = do
 codegenExpr (UnaryOp tp op a) = do
   a' <- codegenExpr a
   unOp op (ty tp) a'
-codegenExpr (Integer i) = return $ cons $ C.Int 64 (toInteger i)
-codegenExpr (Float f) = return $ cons $ C.Float (F.Double f)
-codegenExpr (Bool b) = return $ cons $ C.Int 1 (toInteger $ fromEnum b)
 codegenExpr (Arguments tp (Name fntp "append") args) = do
   slice <- getaddr (head args)
   addrs <- mapM (\a -> case a of 
@@ -265,10 +271,16 @@ codegenExpr (Arguments tp (Name fntp "append") args) = do
       mem <- alloca . lltype $ ttOf a
       store (lltype $ ttOf a) mem val
       bitcast mem (ptr $ char)) $ tail args
-  ret <- call (llsliceptr) (externf (llappend) (AST.Name "append")) (slice : addrs)
-  load (llslice) ret
+  call (llsliceptr) (externf (llappend) (AST.Name "append")) (slice : addrs)
   where llappend = T.FunctionType (llsliceptr) [llsliceptr, ptr $ char] False
-
+codegenExpr (Arguments tp (Name ann "println") args) = do
+  mapM (\a -> codegenExpr (Arguments tp (Name ann $ func a) [a])) $ (intersperse (Rune " ") args) ++ [Rune "\n"]
+  return one
+  where func = ((++) "print.") . (map toLower) . show . toConstr . ttOf
+codegenExpr (Arguments tp (Name ann "print") args) = do
+  mapM (\a -> codegenExpr (Arguments tp (Name ann $ func a) [a])) (intersperse (Rune " ") args)
+  return one
+  where func = ((++) "print.") . (map toLower) . show . toConstr . ttOf
 codegenExpr (Arguments tp fn args) = do
   largs <- mapM codegenExpr args
   let fnN = case fn of 
@@ -276,7 +288,10 @@ codegenExpr (Arguments tp fn args) = do
   call (lltype $ truety tp) (externf (lltype $ truety tp) (AST.Name fnN)) largs
 codegenExpr (Name tp id) = do
   op <- getvar (AST.Name id)
-  load (lltype $ truety tp) op
+  case truety tp of
+    TString -> return op
+    Slice _ -> return op
+    _ -> load (lltype $ truety tp) op
 codegenExpr s@(Selector a _ _) = do
   ptr <- getaddr s
   load (lltype $ truety a) ptr
@@ -291,10 +306,31 @@ codegenExpr (Conversion a t e) = do
   if truety a == (truety $ annOf e)
   then return $ exp
   else converter exp
-
+codegenExpr (Integer i) = return $ cons $ C.Int 64 (toInteger i)
+codegenExpr (Float f) = return $ cons $ C.Float (F.Double f)
+codegenExpr (Bool b) = return $ cons $ C.Int 1 (toInteger $ fromEnum b)
+codegenExpr (IntString s) = do
+  nm <- addConstant (arraytp s) $ C.Array char $ map (\c -> C.Int 8 $ toInteger $ ord c) s
+  charptr <- gep (ptr $ char) (externf (arraytp s) nm) [zero, zero]
+  call llsliceptr (externf llstringcons (AST.Name "string_constant")) [charptr, cons $ C.Int 32 (toInteger $ length s)]
+  where llstringcons = T.FunctionType llsliceptr [ptr $ char, i32] False
+        arraytp s = T.ArrayType (fromIntegral $ length s) T.i8 
+codegenExpr (RawString s) = codegenExpr (IntString s)
+codegenExpr (Rune c) = return $ cons $ C.Int 8 (toInteger . ord $ head c)
+-- codegenExpr (Rune c) = do
 --Rune String
 --IntString String 
 --RawString String
+
+windowed ls = 
+    (case ls of 
+      [] -> []
+      x:xs -> 
+        if length ls >= 2 then 
+          (take 2 ls) : windowed xs
+        else windowed xs)
+
+llint i = cons $ C.Int 32 (toInteger i)
 
 getaddr :: Expression Ann -> Codegen AST.Operand
 getaddr (Name _ x) = getvar (AST.Name x) 
@@ -352,12 +388,13 @@ unalias a = case (ty a, truety a) of
 emit :: Package Ann -> String -> IO ()
 emit pkg nm = do
   let mod = runLLVM (emptyModule "") (codegenPkg pkg)
+  -- putStrLn $ showPretty  mod
   withContext $ \ctxt -> do
     err <- runExceptT $ withModuleFromLLVMAssembly ctxt (File "builtins/builtins.ll") $ \builtins -> do
       err <- liftM join $ runExceptT $ withModuleFromAST ctxt mod $ \m -> do
         withPassManager defaultCuratedPassSetSpec $ \pm -> do
           runExceptT $ linkModules False m builtins
-          -- runPassManager pm m
+          runPassManager pm m
           runExceptT $ writeLLVMAssemblyToFile (File $ nm ++ ".ll") m
           moduleLLVMAssembly m
           liftM join $ runExceptT $ TM.withDefaultTargetMachine $ \target -> do

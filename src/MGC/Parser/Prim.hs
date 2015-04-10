@@ -147,8 +147,9 @@ module MGC.Parser.Prim where
       _ -> fail "invalid unicode escape"
 
   escapeSeq :: Parser String
-  escapeSeq = try $ (char '\\') *> liftM ((:) '\\' . (flip (:) [])) (oneOf "abfnrtv\\'")
-
+  escapeSeq = try $ do
+    char <- (char '\\') *> liftM ((:) '\\' . (flip (:) [])) (oneOf "abfnrtv\\'")
+    return [fst . head $ readLitChar char]
   intLit ::  Parser (Expression ())
   intLit = (hexLit <|> octLit <|> decimalLit) <* lineSpace
 

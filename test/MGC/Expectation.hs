@@ -2,8 +2,8 @@ module MGC.Expectation where
   import Test.Hspec.Expectations
   import Text.Parsec.String
   import Text.Parsec
-  import MGC.Syntax (Type(..), Expression(..))
-  import MGC.Check (typeOf, Ann)
+  import MGC.Syntax (Type(..), Expression(..), Ann)
+  import MGC.Check (typeOf)
   import Control.Monad (unless)
 
   parses :: Parser a -> String -> Either ParseError a
