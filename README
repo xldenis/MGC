@@ -2,6 +2,8 @@ Student ID: 260521681
 
 Xavier Denis
 
+THIS WILL NOT BUILD ON MCGILL SERVERS. THERE IS A DEPENDENCY ON LLVM(3.4) WHICH IS NOT INSTALLED ON THE MACHINES.
+
 
 To build this project run the command 
   cabal sandbox init

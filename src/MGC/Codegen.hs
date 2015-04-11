@@ -132,7 +132,7 @@ module MGC.Codegen where
     lcls <- gets assigned
     case Map.lookup v lcls of
       Just x -> return x
-      Nothing -> error $ "not possible" -- refactor
+      Nothing -> error $ "No assigned variable" -- refactor
 
   addConstant :: Type -> C.Constant -> Codegen Name
   addConstant tp c = do
