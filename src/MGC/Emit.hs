@@ -30,14 +30,14 @@ import LLVM.General.Module
 codegenPkg :: Package Ann -> LLVM ()
 codegenPkg (Package nm tlds) = do
   modify (\s -> s {AST.moduleName = nm})
-  typedef (AST.Name "slice") llslice
+  typedef (AST.Name "slice") $ T.StructureType False [T.i32, T.i32, T.i32, ptr $ char]
   define (llsliceptr) "append"    [(llsliceptr, AST.UnName 0), (ptr $ char, AST.UnName 0)] L.External []
   define (llsliceptr) "new_slice" [(T.i32, AST.UnName 0), (T.i32, AST.UnName 0) , (T.i32, AST.UnName 0)] L.External []
   define (llsliceptr) "string_constant" [(ptr $ char, AST.UnName 0), (T.i32, AST.UnName 0)] L.External []
-  define (llsliceptr) "add_string" [(llsliceptr, AST.UnName 0), (llsliceptr, AST.UnName 0)] L.External []
+  define (llslice) "add_string" [(llslice, AST.UnName 0), (llslice, AST.UnName 0)] L.External []
 
   define (T.void) "print.tinteger" [(T.i64, AST.UnName 0)] L.External []
-  define (T.void) "print.tstring" [(llsliceptr, AST.UnName 0)] L.External []
+  define (T.void) "print.tstring" [(llslice, AST.UnName 0)] L.External []
   define (T.void) "print.trune" [(T.i8, AST.UnName 0)] L.External []
   mapM codegenTop tlds
   return ()
@@ -67,9 +67,8 @@ codegenTop (Decl (TypeDecl ts)) = do
       Struct _ -> typedef (AST.Name n) (lltype t)
       _ -> return ()) ts
   return ()
---codegenTop (Decl VarDecl)
---codegenTop (Decl TypeDecl)
---codegenTop _
+-- codegenTop (Decl VarDecl) = do
+
 
 retty :: Signature -> Type
 retty (Signature _ ret) = ReturnType $ map (\(Parameter _ t) -> t) ret
@@ -154,18 +153,12 @@ codegenStmt (ShortDecl idens exps) = do
   mapM (\(n, e) -> do
     let tp = lltype $ ttOf e
     i <- alloca tp
-    val <- case ttOf e of
-      Slice _ -> codegenExpr e >>= load llslice
-      TString -> codegenExpr e >>= load llslice
-      _       -> codegenExpr e 
+    val <- codegenExpr e 
     store tp i val
     assign (AST.Name n) i) (zip idens exps) >> return ()
 codegenStmt (Assignment Eq lh rh) = do
   lhs <- mapM getaddr lh
-  rhs <- mapM (\e -> case ttOf e of
-      Slice _ -> codegenExpr e >>= load llslice
-      TString -> codegenExpr e >>= load llslice
-      _       -> codegenExpr e) rh
+  rhs <- mapM  codegenExpr rh
   let lt = map ttOf lh
   mapM (\(t,l,r) -> store (lltype $ t) l r) $ zip3 lt lhs rhs
   return ()
@@ -245,10 +238,7 @@ codegenSpec (VarSpec _ idens exps _) = do
   mapM (\(n, e) -> do
     let tp = (lltype $ ttOf e)
     i   <- alloca tp
-    val <- case ttOf e of
-      Slice _ -> codegenExpr e >>= load llslice
-      TString -> codegenExpr e >>= load llslice
-      _       -> codegenExpr e 
+    val <- codegenExpr e 
     store tp i val
     assign (AST.Name n) i) (zip idens exps) >> return ()
 
@@ -288,10 +278,7 @@ codegenExpr (Arguments tp fn args) = do
   call (lltype $ truety tp) (externf (lltype $ truety tp) (AST.Name fnN)) largs
 codegenExpr (Name tp id) = do
   op <- getvar (AST.Name id)
-  case truety tp of
-    TString -> return op
-    Slice _ -> return op
-    _ -> load (lltype $ truety tp) op
+  load (lltype $ truety tp) op
 codegenExpr s@(Selector a _ _) = do
   ptr <- getaddr s
   load (lltype $ truety a) ptr
@@ -312,7 +299,8 @@ codegenExpr (Bool b) = return $ cons $ C.Int 1 (toInteger $ fromEnum b)
 codegenExpr (IntString s) = do
   nm <- addConstant (arraytp s) $ C.Array char $ map (\c -> C.Int 8 $ toInteger $ ord c) s
   charptr <- gep (ptr $ char) (externf (arraytp s) nm) [zero, zero]
-  call llsliceptr (externf llstringcons (AST.Name "string_constant")) [charptr, cons $ C.Int 32 (toInteger $ length s)]
+  ptr <- call llsliceptr (externf llstringcons (AST.Name "string_constant")) [charptr, cons $ C.Int 32 (toInteger $ length s)]
+  load llslice ptr
   where llstringcons = T.FunctionType llsliceptr [ptr $ char, i32] False
         arraytp s = T.ArrayType (fromIntegral $ length s) T.i8 
 codegenExpr (RawString s) = codegenExpr (IntString s)
@@ -388,7 +376,7 @@ unalias a = case (ty a, truety a) of
 emit :: Package Ann -> String -> IO ()
 emit pkg nm = do
   let mod = runLLVM (emptyModule "") (codegenPkg pkg)
-  -- putStrLn $ showPretty  mod
+  putStrLn $ showPretty  mod
   withContext $ \ctxt -> do
     err <- runExceptT $ withModuleFromLLVMAssembly ctxt (File "builtins/builtins.ll") $ \builtins -> do
       err <- liftM join $ runExceptT $ withModuleFromAST ctxt mod $ \m -> do

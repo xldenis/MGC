@@ -142,33 +142,28 @@ define %slice* @append(%slice* %this, i8* %el) {
 ;; STRING FUNCTIONS
 ;;------------------------------------------------
 
-define %slice* @add_string(%slice* %a, %slice* %b) {
-  %1 = getelementptr %slice* %a, i32 0, i32 0
-  %2 = getelementptr %slice* %b, i32 0, i32 0
-
-  %alen = load i32* %1
-  %blen = load i32* %2
+define %slice @add_string(%slice %a, %slice %b) {
+  %alen = extractvalue %slice %a, 0
+  %blen = extractvalue %slice %b, 0
 
   %nlen = add i32 %alen, %blen
 
   %ret = call %slice* @new_slice(i32 %nlen,i32 %nlen, i32 1)
 
-  %3 = getelementptr %slice* %a, i32 0, i32 3
-  %4 = getelementptr %slice* %b, i32 0, i32 3
+  %1 = extractvalue %slice %a, 3
+  %2 = extractvalue %slice %b, 3
 
-  %5 = load i8** %3
-  %6 = load i8** %4
+  %3 = getelementptr %slice* %ret, i32 0, i32 3
+  %4 = load i8** %3
 
+  %5 = getelementptr i8* %4, i32 %alen
 
-  %7 = getelementptr %slice* %ret, i32 0, i32 3
-  %8 = load i8** %7
+  call i8* @memcpy(i8* %4, i8* %1, i32 %alen)
+  call i8* @memcpy(i8* %5, i8* %2, i32 %blen)
 
-  %9 = getelementptr i8* %8, i32 %alen
+  %8 = load %slice* %ret
 
-  call i8* @memcpy(i8* %8, i8* %5, i32 %alen)
-  call i8* @memcpy(i8* %9, i8* %6, i32 %blen)
-
-  ret %slice* %ret
+  ret %slice %8
 }
 
 define %slice* @string_constant(i8* %cons, i32 %len) {
@@ -186,15 +181,12 @@ define %slice* @string_constant(i8* %cons, i32 %len) {
 
 declare void @putchar(i8)
 
-define void @print.tstring(%slice* %this) {
-  %1 = getelementptr %slice* %this, i32 0, i32 0
-  %len = load i32* %1
+define void @print.tstring(%slice %this) {
+  %len = extractvalue %slice %this, 0
 
-  %2 = getelementptr %slice* %this, i32 0, i32 2
-  %elsz = load i32* %2
+  %elsz = extractvalue %slice %this, 2
 
-  %3 = getelementptr %slice* %this, i32 0, i32 3
-  %ptr = load i8** %3
+  %ptr = extractvalue %slice %this, 3
 
   br label %loop
   

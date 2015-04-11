@@ -263,7 +263,8 @@ module MGC.Codegen where
   sizeof :: Type -> Operand
   sizeof t = cons $ C.GetElementPtr False (C.Null . ptr $ t) [C.Int  64 1]
 
-  llslice = T.StructureType False [T.i32, T.i32, T.i32, T.PointerType T.i8 (AS.AddrSpace 0)]
+  -- llslice = T.StructureType False [T.i32, T.i32, T.i32, T.PointerType T.i8 (AS.AddrSpace 0)]
+  llslice = T.NamedTypeReference $ Name "slice"
   llsliceptr = T.PointerType (lltype $ S.TypeName "slice") (AS.AddrSpace 0)
   llnewslice = T.FunctionType (llsliceptr) [T.i32, T.i32, T.i32] False
 
@@ -320,8 +321,8 @@ module MGC.Codegen where
   add tp a b = case tp of
     S.TInteger -> instr int $ Add False False a b []
     S.TFloat   -> instr double $ FAdd NoFastMathFlags a b []
-    S.TString  -> call llsliceptr (externf stringadd (Name "add_string")) [a, b]
-      where stringadd = T.FunctionType llsliceptr [llsliceptr, llsliceptr] False
+    S.TString  -> call llslice (externf stringadd (Name "add_string")) [a, b]
+      where stringadd = T.FunctionType llslice [llslice, llslice] False
     _ -> error $ "Cannot generate code for +"
 
   sub :: S.Type -> Operand -> Operand -> Codegen Operand
