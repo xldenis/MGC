@@ -1,7 +1,13 @@
 package main
 
+func t(x []int) []int{
+  var y []int = append(x, 4)
+  println(y[0])
+  return y
+}
+
 func main() int {
-  var x string = "test\n"
-  println("t" + "e" + "s" + "t")
-  return 1
+  var x []int
+  x = t(x)
+  return x[0]
 }

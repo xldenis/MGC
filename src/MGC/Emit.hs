@@ -67,8 +67,33 @@ codegenTop (Decl (TypeDecl ts)) = do
       Struct _ -> typedef (AST.Name n) (lltype t)
       _ -> return ()) ts
   return ()
--- codegenTop (Decl VarDecl) = do
+codegenTop (Decl (VarDecl s)) = do
+  mapM codegenGbl s
+  return ()
 
+codegenGbl (VarSpec _ idens exps _) = do
+  mapM (\(n,e) -> global (AST.Name n) (lltype $ ttOf e) (gVal e)) $ zip idens exps
+-- codegenGbl (VarSpec a idens [] (Just tp)) = do
+--   mapM (\n -> global $ (AST.Name n) (lltype $ truety a) (defVal $ truety a)) idens
+
+gVal :: Expression Ann -> C.Constant
+gVal (Integer i)   = C.Int 64 (toInteger i)
+gVal (Float f)     = C.Float (F.Double f)
+gVal (Bool b)      = C.Int 1 (toInteger $ fromEnum b)
+gVal (IntString s) = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr $ char)]
+gVal (RawString s) = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr $ char)]
+gVal (Rune c)      = C.Int 8 (toInteger . ord $ head c)
+gVal (Name tp n)   = C.GlobalReference (lltype $ truety tp) $ AST.Name n
+
+defVal :: Type -> C.Constant
+defVal (TInteger)  = C.Int 64 0
+defVal (TFloat)    = C.Float (F.Double 0.0)
+defVal (TString)   = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr $ char)]
+defVal (TRune)     = C.Int 8 0
+defVal (TBool)     = C.Int 1 0
+defVal (Slice tp)  = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr $ char)]
+-- defVal (Struct f)  = C.Struct 
+defVal (Array l t) = C.Array (lltype t) $ replicate l (defVal t)
 
 retty :: Signature -> Type
 retty (Signature _ ret) = ReturnType $ map (\(Parameter _ t) -> t) ret
@@ -305,10 +330,6 @@ codegenExpr (IntString s) = do
         arraytp s = T.ArrayType (fromIntegral $ length s) T.i8 
 codegenExpr (RawString s) = codegenExpr (IntString s)
 codegenExpr (Rune c) = return $ cons $ C.Int 8 (toInteger . ord $ head c)
--- codegenExpr (Rune c) = do
---Rune String
---IntString String 
---RawString String
 
 windowed ls = 
     (case ls of 

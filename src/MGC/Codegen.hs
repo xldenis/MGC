@@ -95,6 +95,16 @@ module MGC.Codegen where
     , initializer = Just cons
 
     }
+
+  global :: Name -> Type -> C.Constant -> LLVM ()
+  global nm tp cons =  addDefn $ 
+    GlobalDefinition $ globalVariableDefaults {
+    name = nm
+    , G.type' = tp
+    , isConstant = False
+    , initializer = Just cons
+
+    }  
   typedef :: Name -> Type -> LLVM ()
   typedef nm tp = addDefn $ TypeDefinition nm (Just tp)
 
