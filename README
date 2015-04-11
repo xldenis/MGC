@@ -8,4 +8,12 @@ To build this project run the command
   cabal install --upgrade-dependencies --constraint="template-haskell installed" --dependencies-only
   cabal build
 
+To build a file, from the main directory run:
+ cabal run -- file.go
+ gcc file.s
+
+This will produce an executable, either the default a.out or if the -o option is specified, whatever output was desired.
+
+Simply run the final exectuable for the desired results.
+ 
 This will build the binary in `dist/mgc/mgc`
