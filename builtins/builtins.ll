@@ -82,60 +82,51 @@ define void @resize(%slice* %this, i32 %len) {
   ret void
 }
 
-define i32 @copy(%slice* %dst, %slice* %src) {
-  %1 = getelementptr %slice* %dst, i32 0, i32 0
-  %2 = getelementptr %slice* %src, i32 0, i32 0
+define i32 @copy(%slice %dst, %slice %src) {
+  %dlen = extractvalue %slice %dst, 0
+  %slen = extractvalue %slice %src, 0
 
-  %dlen = load i32* %1
-  %slen = load i32* %2
+  %1 = icmp sgt i32 %dlen, %slen
+  %mlen = select i1 %1, i32 %slen, i32 %dlen ;; Find min length
 
-  %3 = icmp sgt i32 %dlen, %slen
-  %mlen = select i1 %3, i32 %slen, i32 %dlen ;; Find min length
+  %dbuf = extractvalue %slice %dst, 3
+  %sbuf = extractvalue %slice %src, 3
 
-  %4 = getelementptr %slice* %dst, i32 0, i32 3
-  %5 = getelementptr %slice* %src, i32 0, i32 3
+  %tylen = extractvalue %slice %dst, 2
 
-  %dbuf = load i8** %4
-  %sbuf = load i8** %5
+  %2 = mul i32 %mlen, %tylen
 
-  %6 = getelementptr %slice* %dst, i32 0, i32 2
-  %tylen = load i32* %6
-
-  %7 = mul i32 %mlen, %tylen
-
-  call i8* @memcpy(i8* %dbuf, i8* %sbuf, i32 %7)
+  call i8* @memcpy(i8* %dbuf, i8* %sbuf, i32 %2)
 
   ret i32 %mlen
 }
  
-define %slice* @append(%slice* %this, i8* %el) {
-  %1   = getelementptr %slice* %this, i32 0, i32 0
-  %len = load i32* %1
+define %slice @append(%slice %this, i8* %el) {
+  %len   = extractvalue %slice %this, 0
 
-  %2   = getelementptr %slice* %this, i32 0, i32 1
-  %cap = load i32* %2
+  %cap   = extractvalue %slice %this, 1
 
-  %3 = sub i32 %cap, %len ; space left in slice
-  %4 = icmp ne i32 %3, 0
+  %1 = sub i32 %cap, %len ; space left in slice
+  %2 = icmp ne i32 %1, 0
   %ncap = mul i32 %cap, 2 ; new cap
-  %ocap = select i1 %4, i32 %cap, i32 %ncap ; if we need to, grow
+  %ocap = select i1 %2, i32 %cap, i32 %ncap ; if we need to, grow
 
-  %5 = getelementptr %slice* %this, i32 0, i32 2
-  %elsz = load i32* %5
+  %elsz = extractvalue %slice %this, 2
   %newlen = add i32 %len, 1
   %ret = call %slice* @new_slice(i32 %newlen, i32 %ncap, i32 %elsz)
+  %retval = load %slice* %ret
 
-  call i32 @copy(%slice* %ret, %slice* %this)
+  call i32 @copy(%slice %retval, %slice %this)
 
-  %7 = getelementptr %slice* %ret, i32 0, i32 3
-  %8 = load i8** %7
+  %4 = getelementptr %slice* %ret, i32 0, i32 3
+  %5 = load i8** %4
 
-  %9 = mul i32 %len, %elsz
-  %10 = getelementptr i8* %8, i32 %9
+  %6 = mul i32 %len, %elsz
+  %7 = getelementptr i8* %5, i32 %6
 
-  call i8* @memcpy(i8* %10, i8* %el, i32 %elsz)
+  call i8* @memcpy(i8* %7, i8* %el, i32 %elsz)
 
-  ret %slice* %ret
+  ret %slice %retval
 }
 
 ;;------------------------------------------------

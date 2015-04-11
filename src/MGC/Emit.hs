@@ -31,7 +31,7 @@ codegenPkg :: Package Ann -> LLVM ()
 codegenPkg (Package nm tlds) = do
   modify (\s -> s {AST.moduleName = nm})
   typedef (AST.Name "slice") $ T.StructureType False [T.i32, T.i32, T.i32, ptr $ char]
-  define (llsliceptr) "append"    [(llsliceptr, AST.UnName 0), (ptr $ char, AST.UnName 0)] L.External []
+  define (llslice) "append"    [(llslice, AST.UnName 0), (ptr $ char, AST.UnName 0)] L.External []
   define (llsliceptr) "new_slice" [(T.i32, AST.UnName 0), (T.i32, AST.UnName 0) , (T.i32, AST.UnName 0)] L.External []
   define (llsliceptr) "string_constant" [(ptr $ char, AST.UnName 0), (T.i32, AST.UnName 0)] L.External []
   define (llslice) "add_string" [(llslice, AST.UnName 0), (llslice, AST.UnName 0)] L.External []
@@ -251,7 +251,7 @@ codegenExpr (UnaryOp tp op a) = do
   a' <- codegenExpr a
   unOp op (ty tp) a'
 codegenExpr (Arguments tp (Name fntp "append") args) = do
-  slice <- getaddr (head args)
+  slice <- codegenExpr (head args)
   addrs <- mapM (\a -> case a of 
     n@(Name _ _)-> getaddr n >>= \o -> bitcast o (ptr $ char)
     s@(Selector _ _ _)-> getaddr s >>= \o -> bitcast o (ptr $ char)
@@ -261,7 +261,7 @@ codegenExpr (Arguments tp (Name fntp "append") args) = do
       mem <- alloca . lltype $ ttOf a
       store (lltype $ ttOf a) mem val
       bitcast mem (ptr $ char)) $ tail args
-  call (llsliceptr) (externf (llappend) (AST.Name "append")) (slice : addrs)
+  call (llslice) (externf (llappend) (AST.Name "append")) (slice : addrs)
   where llappend = T.FunctionType (llsliceptr) [llsliceptr, ptr $ char] False
 codegenExpr (Arguments tp (Name ann "println") args) = do
   mapM (\a -> codegenExpr (Arguments tp (Name ann $ func a) [a])) $ (intersperse (Rune " ") args) ++ [Rune "\n"]
@@ -376,7 +376,7 @@ unalias a = case (ty a, truety a) of
 emit :: Package Ann -> String -> IO ()
 emit pkg nm = do
   let mod = runLLVM (emptyModule "") (codegenPkg pkg)
-  putStrLn $ showPretty  mod
+  -- putStrLn $ showPretty  mod
   withContext $ \ctxt -> do
     err <- runExceptT $ withModuleFromLLVMAssembly ctxt (File "builtins/builtins.ll") $ \builtins -> do
       err <- liftM join $ runExceptT $ withModuleFromAST ctxt mod $ \m -> do
