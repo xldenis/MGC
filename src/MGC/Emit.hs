@@ -35,7 +35,7 @@ codegenPkg (Package nm tlds) = do
   define (llsliceptr) "new_slice" [(T.i32, AST.UnName 0), (T.i32, AST.UnName 0) , (T.i32, AST.UnName 0)] L.External []
   define (llsliceptr) "string_constant" [(ptr $ char, AST.UnName 0), (T.i32, AST.UnName 0)] L.External []
   define (llslice) "add_string" [(llslice, AST.UnName 0), (llslice, AST.UnName 0)] L.External []
-
+  define (T.void) "llvm.trap" [] L.External []
   define (T.void) "print.tinteger" [(T.i64, AST.UnName 0)] L.External []
   define (T.void) "print.tstring" [(llslice, AST.UnName 0)] L.External []
   define (T.void) "print.trune" [(T.i8, AST.UnName 0)] L.External []
@@ -72,9 +72,18 @@ codegenTop (Decl (VarDecl s)) = do
   return ()
 
 codegenGbl (VarSpec _ idens exps _) = do
-  mapM (\(n,e) -> global (AST.Name n) (lltype $ ttOf e) (gVal e)) $ zip idens exps
--- codegenGbl (VarSpec a idens [] (Just tp)) = do
---   mapM (\n -> global $ (AST.Name n) (lltype $ truety a) (defVal $ truety a)) idens
+  mapM (\(n,e) -> do
+    cons <- case e of
+      IntString s -> tempfunc n s
+      RawString s -> tempfunc n s
+      _ -> return $ gVal e
+    global (AST.Name n) (lltype $ ttOf e) (cons)) $ zip idens exps
+  where arraytp s = T.ArrayType (fromIntegral $ length s) T.i8 
+        tempfunc n s = do
+          constant (AST.Name $ n ++ ".cons") (arraytp s) $ C.Array char $ map (\c -> C.Int 8 $ toInteger $ ord c) s
+          return $ C.Struct (Just $ AST.Name "slice") True [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.GetElementPtr True (C.GlobalReference (ptr $ arraytp s) (AST.Name $ n ++ ".cons")) [C.Int 32 0, C.Int 32 0]]
+codegenGbl (VarSpec a idens [] (Just tp)) = do
+  mapM (\n -> global (AST.Name n) (lltype $ truety a) (defVal $ truety a)) idens
 
 gVal :: Expression Ann -> C.Constant
 gVal (Integer i)   = C.Int 64 (toInteger i)
@@ -353,14 +362,17 @@ getaddr (S.Index a s i) = do
   arr <- getaddr s
   longId <- codegenExpr i
   idx <- trunc longId i32
-  elsize <- gep (ptr $ i32) arr [zero, llint 2] >>= load i32
-
-  offset <- imul i32 idx elsize
-  bufPtrPtr <- gep (ptr $ ptr $ char) arr [zero, llint 3]
-  bufPtr    <- load (ptr $ ptr $ char) bufPtrPtr
-  addr <- gep (ptr $ char) bufPtr [offset]
-  bitcast addr (ptr $ lltype $ truety a)
-
+  ckbnds (ttOf s) arr idx
+  case ttOf s of
+    Slice _ -> do
+      elsize <- gep (ptr $ i32) arr [zero, llint 2] >>= load i32
+      offset <- imul i32 idx elsize
+      bufPtrPtr <- gep (ptr $ ptr $ char) arr [zero, llint 3]
+      bufPtr    <- load (ptr $ ptr $ char) bufPtrPtr
+      addr <- gep (ptr $ char) bufPtr [offset]
+      bitcast addr (ptr $ lltype $ truety a)
+    _ -> do
+      gep (ptr $ lltype $ truety a) arr [zero, idx]
 binFunc :: BinOp -> Type -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 binFunc BitAnd _ = band
 binFunc BitClear _ = bclear
@@ -397,7 +409,7 @@ unalias a = case (ty a, truety a) of
 emit :: Package Ann -> String -> IO ()
 emit pkg nm = do
   let mod = runLLVM (emptyModule "") (codegenPkg pkg)
-  -- putStrLn $ showPretty  mod
+  putStrLn $ showPretty  mod
   withContext $ \ctxt -> do
     err <- runExceptT $ withModuleFromLLVMAssembly ctxt (File "builtins/builtins.ll") $ \builtins -> do
       err <- liftM join $ runExceptT $ withModuleFromAST ctxt mod $ \m -> do

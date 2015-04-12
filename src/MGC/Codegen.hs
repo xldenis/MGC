@@ -132,7 +132,7 @@ module MGC.Codegen where
     lcls <- gets assigned
     case Map.lookup v lcls of
       Just x -> return x
-      Nothing -> error $ "No assigned variable" -- refactor
+      Nothing -> return $ externf T.void v -- refactor
 
   addConstant :: Type -> C.Constant -> Codegen Name
   addConstant tp c = do
@@ -437,16 +437,25 @@ module MGC.Codegen where
   trunc :: Operand -> Type -> Codegen Operand
   trunc o t = instr t $ Trunc o t []
 
+  sext :: Operand -> Type -> Codegen Operand
+  sext o t = instr t $ SExt o t []
+
   gep :: Type -> Operand -> [Operand] -> Codegen Operand
   gep t a i = instr t $ GetElementPtr False a i []
 
   ckbnds :: S.Type -> Operand -> Operand -> Codegen () 
-  ckbnds (S.Slice _) s i  = do
-    len <- gep T.i32 s [zero, zero]
-    lt S.TInteger i len
-    return ()
+  ckbnds a s i  = do
+    len <- case a of 
+      S.Slice _ -> gep T.i32 s [zero, zero]
+      S.Array l _ -> return $ cons $ C.Int 32 (toInteger l)
+    bt <- addBlock "check.true"
+    bf <- addBlock "check.false"
 
-  ckbnds (S.Array l _) s i = do
-    len <- return $ cons $ C.Int 64 (toInteger l)
-    lt S.TInteger i len
+    test <- lt S.TInteger i len
+    cbr test bt bf
+    setBlock bf
+    call T.void (externf T.void $ Name "llvm.trap") []
+    retvoid
+    setBlock bt
+
     return ()
