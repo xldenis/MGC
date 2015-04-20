@@ -1,9 +1,11 @@
 module MGC.Emit where
 
 import Prelude hiding (mod, div, not)
+import Paths_mgc (getDataFileName)
 import Control.Monad
 import Control.Monad.State (modify, gets)
 import Control.Monad.Except
+
 import Data.List (findIndex, sortBy, intersperse)
 import Data.Ord  (Ordering(..))
 import Data.Either (rights)
@@ -20,7 +22,6 @@ import qualified LLVM.General.AST as AST
 import qualified LLVM.General.AST.Type as T
 import qualified LLVM.General.Target as TM
 import qualified LLVM.General.AST.Linkage as L
-
 
 import LLVM.General.PrettyPrint
 import LLVM.General.PassManager
@@ -101,7 +102,6 @@ defVal (TString)   = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int
 defVal (TRune)     = C.Int 8 0
 defVal (TBool)     = C.Int 1 0
 defVal (Slice tp)  = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr $ char)]
--- defVal (Struct f)  = C.Struct 
 defVal (Array l t) = C.Array (lltype t) $ replicate l (defVal t)
 
 retty :: Signature -> Type
@@ -411,7 +411,8 @@ emit pkg nm = do
   let mod = runLLVM (emptyModule "") (codegenPkg pkg)
   putStrLn $ showPretty  mod
   withContext $ \ctxt -> do
-    err <- runExceptT $ withModuleFromLLVMAssembly ctxt (File "builtins/builtins.ll") $ \builtins -> do
+    path <- getDataFileName "builtins/builtins.ll"
+    err <- runExceptT $ withModuleFromLLVMAssembly ctxt (File path) $ \builtins -> do
       err <- liftM join $ runExceptT $ withModuleFromAST ctxt mod $ \m -> do
         withPassManager defaultCuratedPassSetSpec $ \pm -> do
           runExceptT $ linkModules False m builtins
