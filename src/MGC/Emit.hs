@@ -409,7 +409,6 @@ unalias a = case (ty a, truety a) of
 emit :: Package Ann -> String -> IO ()
 emit pkg nm = do
   let mod = runLLVM (emptyModule "") (codegenPkg pkg)
-  putStrLn $ showPretty  mod
   withContext $ \ctxt -> do
     path <- getDataFileName "builtins/builtins.ll"
     err <- runExceptT $ withModuleFromLLVMAssembly ctxt (File path) $ \builtins -> do
