@@ -31,77 +31,77 @@ import LLVM.General.Module
 codegenPkg :: Package Ann -> LLVM ()
 codegenPkg (Package nm tlds) = do
   modify (\s -> s {AST.moduleName = nm})
-  typedef (AST.Name "slice") $ T.StructureType False [T.i32, T.i32, T.i32, ptr $ char]
-  define (llslice) "append"    [(llslice, AST.UnName 0), (ptr $ char, AST.UnName 0)] L.External []
-  define (llsliceptr) "new_slice" [(T.i32, AST.UnName 0), (T.i32, AST.UnName 0) , (T.i32, AST.UnName 0)] L.External []
-  define (llsliceptr) "string_constant" [(ptr $ char, AST.UnName 0), (T.i32, AST.UnName 0)] L.External []
-  define (llslice) "add_string" [(llslice, AST.UnName 0), (llslice, AST.UnName 0)] L.External []
-  define (T.void) "llvm.trap" [] L.External []
-  define (T.void) "print.tinteger" [(T.i64, AST.UnName 0)] L.External []
-  define (T.void) "print.tstring" [(llslice, AST.UnName 0)] L.External []
-  define (T.void) "print.trune" [(T.i8, AST.UnName 0)] L.External []
-  mapM codegenTop tlds
+  typedef (AST.Name "slice") $ T.StructureType False [T.i32, T.i32, T.i32, ptr char]
+  define llslice "append"    [(llslice, AST.UnName 0), (ptr char, AST.UnName 0)] L.External []
+  define llsliceptr "new_slice" [(T.i32, AST.UnName 0), (T.i32, AST.UnName 0) , (T.i32, AST.UnName 0)] L.External []
+  define llsliceptr "string_constant" [(ptr char, AST.UnName 0), (T.i32, AST.UnName 0)] L.External []
+  define llslice "add_string" [(llslice, AST.UnName 0), (llslice, AST.UnName 0)] L.External []
+  define T.void "llvm.trap" [] L.External []
+  define T.void "print.tinteger" [(T.i64, AST.UnName 0)] L.External []
+  define T.void "print.tstring" [(llslice, AST.UnName 0)] L.External []
+  define T.void "print.trune" [(T.i8, AST.UnName 0)] L.External []
+  mapM_ codegenTop tlds
   return ()
 
 codegenTop :: TopLevelDeclaration Ann -> LLVM ()
 codegenTop (FunctionDecl nm sig Empty) = define (lltype $ retty sig) nm (argty sig) L.External []
 codegenTop (FunctionDecl nm sig body) = do
   codegenTop (Decl (TypeDecl $ types cg))
-  mapM (\(nm, tp, cons) -> constant nm tp cons ) $ constants cg
+  mapM_ (\(nm, tp, cons) -> constant nm tp cons ) $ constants cg
   define (lltype $ retty  sig) nm largs linkage blks
   where
     linkage = if nm == "main" then L.External else L.Internal
     largs = argty sig
-    blks  = createBlocks $ cg
+    blks  = createBlocks cg
     cg    = execCodegen $ do
       entry <- addBlock entryBlockName
       setBlock entry
-      forM largs $ \(atp, a) -> do
+      forM_ largs $ \(atp, a) -> do
         var <- alloca atp
         store atp var (local atp a)
         assign a var
       codegenStmt body
       retvoid
 codegenTop (Decl (TypeDecl ts)) = do
-  mapM (\(TypeSpec a n t) -> case truety a of
-    TypeName n -> case t of
-      Struct _ -> typedef (AST.Name n) (lltype t)
-      _ -> return ()) ts
+  mapM_ (\(TypeSpec a n t) -> case truety a of
+     TypeName n -> case t of
+       Struct _ -> typedef (AST.Name n) (lltype t)
+       _ -> return ()) ts
   return ()
 codegenTop (Decl (VarDecl s)) = do
-  mapM codegenGbl s
+  mapM_ codegenGbl s
   return ()
 
-codegenGbl (VarSpec _ idens exps _) = do
+codegenGbl (VarSpec _ idens exps _) =
   mapM (\(n,e) -> do
-    cons <- case e of
-      IntString s -> tempfunc n s
-      RawString s -> tempfunc n s
-      _ -> return $ gVal e
-    global (AST.Name n) (lltype $ ttOf e) (cons)) $ zip idens exps
-  where arraytp s = T.ArrayType (fromIntegral $ length s) T.i8 
+  cons <- case e of
+    IntString s -> tempfunc n s
+    RawString s -> tempfunc n s
+    _ -> return $ gVal e
+  global (AST.Name n) (lltype $ ttOf e) (cons)) $ zip idens exps
+  where arraytp s = T.ArrayType (fromIntegral $ length s) T.i8
         tempfunc n s = do
-          constant (AST.Name $ n ++ ".cons") (arraytp s) $ C.Array char $ map (\c -> C.Int 8 $ toInteger $ ord c) s
+          constant (AST.Name $ n ++ ".cons") (arraytp s) $ C.Array char $ map (C.Int 8 . toInteger . ord) s
           return $ C.Struct (Just $ AST.Name "slice") True [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.GetElementPtr True (C.GlobalReference (ptr $ arraytp s) (AST.Name $ n ++ ".cons")) [C.Int 32 0, C.Int 32 0]]
-codegenGbl (VarSpec a idens [] (Just tp)) = do
+codegenGbl (VarSpec a idens [] (Just tp)) =
   mapM (\n -> global (AST.Name n) (lltype $ truety a) (defVal $ truety a)) idens
 
 gVal :: Expression Ann -> C.Constant
 gVal (Integer i)   = C.Int 64 (toInteger i)
 gVal (Float f)     = C.Float (F.Double f)
 gVal (Bool b)      = C.Int 1 (toInteger $ fromEnum b)
-gVal (IntString s) = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr $ char)]
-gVal (RawString s) = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr $ char)]
+gVal (IntString s) = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr char)]
+gVal (RawString s) = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr char)]
 gVal (Rune c)      = C.Int 8 (toInteger . ord $ head c)
 gVal (Name tp n)   = C.GlobalReference (lltype $ truety tp) $ AST.Name n
 
 defVal :: Type -> C.Constant
-defVal (TInteger)  = C.Int 64 0
-defVal (TFloat)    = C.Float (F.Double 0.0)
-defVal (TString)   = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr $ char)]
-defVal (TRune)     = C.Int 8 0
-defVal (TBool)     = C.Int 1 0
-defVal (Slice tp)  = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr $ char)]
+defVal TInteger  = C.Int 64 0
+defVal TFloat    = C.Float (F.Double 0.0)
+defVal TString   = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr char)]
+defVal TRune     = C.Int 8 0
+defVal TBool     = C.Int 1 0
+defVal (Slice tp)  = C.Struct (Just $ AST.Name "slice") False [C.Int 32 0, C.Int 32 0, C.Int 32 0, C.Null (ptr char)]
 defVal (Array l t) = C.Array (lltype t) $ replicate l (defVal t)
 
 retty :: Signature -> Type
@@ -111,8 +111,8 @@ argty :: Signature -> [(AST.Type, AST.Name)]
 argty (Signature arg _) = concatMap (\(Parameter ids t) -> map (\i -> (lltype t, AST.Name i)) ids) arg
 
 codegenStmt :: Statement Ann -> Codegen ()
-codegenStmt (Return exp) = (if length exp /= 0 then codegenExpr (head exp) >>= ret else retvoid) >> return ()
-codegenStmt (ExpressionStmt e) = codegenExpr e >> return ()
+codegenStmt (Return exp) = Control.Monad.void (if length exp /= 0 then codegenExpr (head exp) >>= ret else retvoid)
+codegenStmt (ExpressionStmt e) = Control.Monad.void (codegenExpr e)
 codegenStmt (If s cnd l r) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -130,13 +130,13 @@ codegenStmt (If s cnd l r) = do
   ifelse <- getBlock
   setBlock ifexit
   return ()
-codegenStmt (Empty) = return ()
+codegenStmt Empty = return ()
 codegenStmt (Inc e) = codegenStmt (Assignment Plus [e] [one])
-  where one = if (truety $ annOf e) == TInteger then (Integer 1) else (Float 1.0)
+  where one = if truety (annOf e) == TInteger then Integer 1 else Float 1.0
 codegenStmt (Dec e) = codegenStmt (Assignment Minus [e] [one])
-  where one = if (truety $ annOf e) == TInteger then (Integer 1) else (Float 1.0)
+  where one = if truety (annOf e) == TInteger then Integer 1 else Float 1.0
 codegenStmt (Block s) = do
-  mapM codegenStmt s
+  mapM_ codegenStmt s
   return ()
 codegenStmt (For (Just (ForClause s e p)) body) = do
   loopstart <- addBlock "for.start"
@@ -154,7 +154,7 @@ codegenStmt (For (Just (ForClause s e p)) body) = do
   cbr  test loopbody loopend
   setBlock loopbody
   codegenStmt body
-  codegenStmt p  
+  codegenStmt p
   br loopstart
   setBlock loopend
   modify (\s -> s {loopBlock = prev})
@@ -182,48 +182,48 @@ codegenStmt (For cond body) = do
   modify (\s -> s {loopBlock = prev})
 
   return ()
-codegenStmt (VarDecl specs) = mapM codegenSpec specs >> return ()
-codegenStmt (ShortDecl idens exps) = do
+codegenStmt (VarDecl specs) = Control.Monad.void (mapM codegenSpec specs)
+codegenStmt (ShortDecl idens exps) =
   mapM (\(n, e) -> do
-    let tp = lltype $ ttOf e
-    i <- alloca tp
-    val <- codegenExpr e 
-    store tp i val
-    assign (AST.Name n) i) (zip idens exps) >> return ()
+  let tp = lltype $ ttOf e
+  i <- alloca tp
+  val <- codegenExpr e
+  store tp i val
+  assign (AST.Name n) i) (zip idens exps) >> return ()
 codegenStmt (Assignment Eq lh rh) = do
   lhs <- mapM getaddr lh
   rhs <- mapM  codegenExpr rh
   let lt = map ttOf lh
-  mapM (\(t,l,r) -> store (lltype $ t) l r) $ zip3 lt lhs rhs
+  mapM_ (\(t,l,r) -> store (lltype t) l r) $ zip3 lt lhs rhs
   return ()
 codegenStmt (Assignment op lh rh) = do
   addr <- mapM getaddr lh
-  updated <- mapM (\(a,b) -> codegenExpr $ (BinaryOp (annOf a) op a b)) (zip lh rh)
-  mapM (\(t, a, v) -> store (lltype $ t) a v) $ zip3 (map ttOf lh) addr updated
+  updated <- mapM (\(a,b) -> codegenExpr (BinaryOp (annOf a) op a b)) (zip lh rh)
+  mapM_ (\(t, a, v) -> store (lltype t) a v) $ zip3 (map ttOf lh) addr updated
   return ()
-codegenStmt (TypeDecl ts) = do
+codegenStmt (TypeDecl ts) =
   modify (\s -> s { types = (types s) ++ ts })
 codegenStmt (Switch s exp clauses) = do
   codegenStmt s
-  cases <- return $ sortBy (\a b -> case (a,b) of
-    (Case _ _, Default _) -> LT
-    (Default _, Case _ _) -> GT
-    _ -> EQ) clauses
+  let cases = sortBy (\a b -> case (a,b) of
+                                (Case _ _, Default _) -> LT
+                                (Default _, Case _ _) -> GT
+                                _ -> EQ) clauses
   blocks <- mapM (\c -> do
     let n = case c of
               (Case _ _) -> "clause"
               _ -> "default"
     head <- addBlock $ n ++ ".head"
     body <- addBlock $ n ++ ".body"
-    return (head, body) 
+    return (head, body)
     ) cases
   end <- addBlock "switch.end"
   br (fst . head $ blocks)
   test <- case exp of
-    Just x -> do{cond <- codegenExpr x; return $ \n -> codegenExpr n >>= (eq (truety $ annOf x) cond)}
-    Nothing -> return $ codegenExpr
+    Just x -> do{cond <- codegenExpr x; return $ codegenExpr Control.Monad.>=> (eq (truety $ annOf x) cond)}
+    Nothing -> return codegenExpr
   prevState <- gets nextBlock
-  mapM (\(((h,b), c):((next,nextBody), _):[]) -> do
+  mapM_ (\[((h,b), c), ((next,nextBody), _)] -> do
       setBlock h
       cond <- case c of
         (Case exps body) -> foldM (\p n -> do
@@ -231,13 +231,13 @@ codegenStmt (Switch s exp clauses) = do
           bor e p) false exps
         (Default _ ) -> return true
       cbr cond b next
-      setBlock b 
+      setBlock b
       modify (\s -> s{ nextBlock = Just nextBody})
-      (\c -> case c of 
+      (\c -> case c of
         (Case _ b) -> mapM codegenStmt b
         (Default b) -> mapM codegenStmt b)  c
       br end
-    ) $ windowed $ (zip blocks cases)++[((end,end),(head cases))]
+    ) $ windowed $ zip blocks cases++[((end,end),head cases)]
   modify (\s -> s {nextBlock = prevState})
   setBlock end
   return ()
@@ -258,23 +258,23 @@ codegenStmt Continue = do
   return ()
 
 codegenSpec :: VarSpec Ann -> Codegen ()
-codegenSpec (VarSpec a idens [] (Just tp)) = do
+codegenSpec (VarSpec a idens [] (Just tp)) =
   mapM (\n -> do
-    i <- case truety a of 
-      Slice t -> call llsliceptr (externf llnewslice (AST.Name "new_slice")) [llint 0, llint 10, llint 1]
-        where sltp = (lltype $ TypeName "slice")
-      TString -> call llsliceptr (externf llnewslice (AST.Name "new_slice")) [llint 0, llint 10, llint 1]
-        where sltp = (lltype $ TypeName "slice")
-      _ -> alloca $ lltype $ truety a
+  i <- case truety a of
+    Slice t -> call llsliceptr (externf llnewslice (AST.Name "new_slice")) [llint 0, llint 10, llint 1]
+      where sltp = (lltype $ TypeName "slice")
+    TString -> call llsliceptr (externf llnewslice (AST.Name "new_slice")) [llint 0, llint 10, llint 1]
+      where sltp = (lltype $ TypeName "slice")
+    _ -> alloca $ lltype $ truety a
 
-    assign (AST.Name n) i) idens >> return ()
-codegenSpec (VarSpec _ idens exps _) = do
+  assign (AST.Name n) i) idens >> return ()
+codegenSpec (VarSpec _ idens exps _) =
   mapM (\(n, e) -> do
-    let tp = (lltype $ ttOf e)
-    i   <- alloca tp
-    val <- codegenExpr e 
-    store tp i val
-    assign (AST.Name n) i) (zip idens exps) >> return ()
+  let tp = (lltype $ ttOf e)
+  i   <- alloca tp
+  val <- codegenExpr e
+  store tp i val
+  assign (AST.Name n) i) (zip idens exps) >> return ()
 
 codegenExpr :: Expression Ann -> Codegen AST.Operand
 codegenExpr (BinaryOp tp op a b) = do
@@ -286,28 +286,28 @@ codegenExpr (UnaryOp tp op a) = do
   unOp op (ty tp) a'
 codegenExpr (Arguments tp (Name fntp "append") args) = do
   slice <- codegenExpr (head args)
-  addrs <- mapM (\a -> case a of 
-    n@(Name _ _)-> getaddr n >>= \o -> bitcast o (ptr $ char)
-    s@(Selector _ _ _)-> getaddr s >>= \o -> bitcast o (ptr $ char)
-    i@(Index _ _ _) -> getaddr i >>= \o -> bitcast o (ptr $ char)
+  addrs <- mapM (\a -> case a of
+    n@(Name _ _)-> getaddr n >>= \o -> bitcast o (ptr char)
+    s@(Selector{})-> getaddr s >>= \o -> bitcast o (ptr char)
+    i@(Index{}) -> getaddr i >>= \o -> bitcast o (ptr char)
     a -> do
       val <- codegenExpr a
       mem <- alloca . lltype $ ttOf a
       store (lltype $ ttOf a) mem val
-      bitcast mem (ptr $ char)) $ tail args
-  call (llslice) (externf (llappend) (AST.Name "append")) (slice : addrs)
-  where llappend = T.FunctionType (llsliceptr) [llsliceptr, ptr $ char] False
+      bitcast mem (ptr char)) $ tail args
+  call llslice (externf llappend (AST.Name "append")) (slice : addrs)
+  where llappend = T.FunctionType llsliceptr [llsliceptr, ptr char] False
 codegenExpr (Arguments tp (Name ann "println") args) = do
-  mapM (\a -> codegenExpr (Arguments tp (Name ann $ func a) [a])) $ (intersperse (Rune " ") args) ++ [Rune "\n"]
+  mapM_ (\a -> codegenExpr (Arguments tp (Name ann $ func a) [a])) $ intersperse (Rune " ") args ++ [Rune "\n"]
   return one
-  where func = ((++) "print.") . (map toLower) . show . toConstr . ttOf
+  where func = (++) "print." . map toLower . show . toConstr . ttOf
 codegenExpr (Arguments tp (Name ann "print") args) = do
-  mapM (\a -> codegenExpr (Arguments tp (Name ann $ func a) [a])) (intersperse (Rune " ") args)
+  mapM_ (\a -> codegenExpr (Arguments tp (Name ann $ func a) [a])) (intersperse (Rune " ") args)
   return one
-  where func = ((++) "print.") . (map toLower) . show . toConstr . ttOf
+  where func = (++) "print." . map toLower . show . toConstr . ttOf
 codegenExpr (Arguments tp fn args) = do
   largs <- mapM codegenExpr args
-  let fnN = case fn of 
+  let fnN = case fn of
               Name _ n -> n
   call (lltype $ truety tp) (externf (lltype $ truety tp) (AST.Name fnN)) largs
 codegenExpr (Name tp id) = do
@@ -324,39 +324,39 @@ codegenExpr (Conversion a t e) = do
   let converter = case truety a of
                     TFloat   -> sitofp
                     TInteger -> fptosi
-  if truety a == (truety $ annOf e)
-  then return $ exp
+  if truety a == truety (annOf e)
+  then return exp
   else converter exp
 codegenExpr (Integer i) = return $ cons $ C.Int 64 (toInteger i)
 codegenExpr (Float f) = return $ cons $ C.Float (F.Double f)
 codegenExpr (Bool b) = return $ cons $ C.Int 1 (toInteger $ fromEnum b)
 codegenExpr (IntString s) = do
-  nm <- addConstant (arraytp s) $ C.Array char $ map (\c -> C.Int 8 $ toInteger $ ord c) s
-  charptr <- gep (ptr $ char) (externf (arraytp s) nm) [zero, zero]
+  nm <- addConstant (arraytp s) $ C.Array char $ map (C.Int 8 . toInteger . ord) s
+  charptr <- gep (ptr char) (externf (arraytp s) nm) [zero, zero]
   ptr <- call llsliceptr (externf llstringcons (AST.Name "string_constant")) [charptr, cons $ C.Int 32 (toInteger $ length s)]
   load llslice ptr
-  where llstringcons = T.FunctionType llsliceptr [ptr $ char, i32] False
-        arraytp s = T.ArrayType (fromIntegral $ length s) T.i8 
+  where llstringcons = T.FunctionType llsliceptr [ptr char, i32] False
+        arraytp s = T.ArrayType (fromIntegral $ length s) T.i8
 codegenExpr (RawString s) = codegenExpr (IntString s)
 codegenExpr (Rune c) = return $ cons $ C.Int 8 (toInteger . ord $ head c)
 
-windowed ls = 
-    (case ls of 
-      [] -> []
-      x:xs -> 
-        if length ls >= 2 then 
-          (take 2 ls) : windowed xs
-        else windowed xs)
+windowed ls =
+    case ls of
+     [] -> []
+     x:xs ->
+       if length ls >= 2 then
+         (take 2 ls) : windowed xs
+       else windowed xs
 
 llint i = cons $ C.Int 32 (toInteger i)
 
 getaddr :: Expression Ann -> Codegen AST.Operand
-getaddr (Name _ x) = getvar (AST.Name x) 
+getaddr (Name _ x) = getvar (AST.Name x)
 getaddr (Selector a s nm) = do
   struct <- getaddr s
   idx <- case fieldIdx (typeOf s) nm of
     Just i -> return $ cons $ C.Int 64 (toInteger i)
-    Nothing -> error $ "Invalid field access"
+    Nothing -> error "Invalid field access"
   gep (lltype $ truety a) struct [zero, idx]
 getaddr (S.Index a s i) = do
   arr <- getaddr s
@@ -365,13 +365,13 @@ getaddr (S.Index a s i) = do
   ckbnds (ttOf s) arr idx
   case ttOf s of
     Slice _ -> do
-      elsize <- gep (ptr $ i32) arr [zero, llint 2] >>= load i32
+      elsize <- gep (ptr i32) arr [zero, llint 2] >>= load i32
       offset <- imul i32 idx elsize
-      bufPtrPtr <- gep (ptr $ ptr $ char) arr [zero, llint 3]
-      bufPtr    <- load (ptr $ ptr $ char) bufPtrPtr
-      addr <- gep (ptr $ char) bufPtr [offset]
+      bufPtrPtr <- gep (ptr $ ptr char) arr [zero, llint 3]
+      bufPtr    <- load (ptr $ ptr char) bufPtrPtr
+      addr <- gep (ptr char) bufPtr [offset]
       bitcast addr (ptr $ lltype $ truety a)
-    _ -> do
+    _ ->
       gep (ptr $ lltype $ truety a) arr [zero, idx]
 binFunc :: BinOp -> Type -> AST.Operand -> AST.Operand -> Codegen AST.Operand
 binFunc BitAnd _ = band
@@ -389,22 +389,22 @@ binFunc And   _ = band
 binFunc Or    _ = bor
 binFunc RShift _ = shl
 binFunc LShift _ = shr
-  
+
 binFunc GreaterThan t   = gt t
 binFunc GreaterThanEq t = geq t
 binFunc LessThan t      = lt t
 binFunc LessThanEq t    = leq t
 
 unOp :: UOp -> S.Type -> AST.Operand -> Codegen AST.Operand
-unOp Pos t o   = (codegenExpr (Integer  1)) >>= mul t o
-unOp Neg t o   = (codegenExpr (Integer $ -1)) >>= mul t o
+unOp Pos t o   = codegenExpr (Integer  1) >>= mul t o
+unOp Neg t o   = codegenExpr (Integer $ -1) >>= mul t o
 unOp Not _ o   = not o
 unOp BComp _ o = bcomp o
 
 unalias :: Ann -> Type
 unalias a = case (ty a, truety a) of
   (TypeName n, Struct _) -> TypeName n
-  (_, tt ) -> tt 
+  (_, tt ) -> tt
 
 emit :: Package Ann -> String -> IO ()
 emit pkg nm = do
@@ -412,18 +412,18 @@ emit pkg nm = do
   withContext $ \ctxt -> do
     path <- getDataFileName "builtins/builtins.ll"
     err <- runExceptT $ withModuleFromLLVMAssembly ctxt (File path) $ \builtins -> do
-      err <- liftM join $ runExceptT $ withModuleFromAST ctxt mod $ \m -> do
+      err <- liftM join $ runExceptT $ withModuleFromAST ctxt mod $ \m ->
         withPassManager defaultCuratedPassSetSpec $ \pm -> do
-          runExceptT $ linkModules False m builtins
-          runPassManager pm m
-          runExceptT $ writeLLVMAssemblyToFile (File $ nm ++ ".ll") m
-          moduleLLVMAssembly m
-          liftM join $ runExceptT $ TM.withDefaultTargetMachine $ \target -> do
-            runExceptT $ writeTargetAssemblyToFile target (File $ nm ++ ".s") m
+        runExceptT $ linkModules False m builtins
+        runPassManager pm m
+        runExceptT $ writeLLVMAssemblyToFile (File $ nm ++ ".ll") m
+        moduleLLVMAssembly m
+        liftM join $ runExceptT $ TM.withHostTargetMachine $ \target -> do
+          runExceptT $ writeTargetAssemblyToFile target (File $ nm ++ ".s") m
       case err of
         Left s  -> putStrLn s
         Right _ -> return ()
     case err of
-      Left d  -> putStrLn $ show d
+      Left d  -> print d
       Right _ -> return ()
   return ()

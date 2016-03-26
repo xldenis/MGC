@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, DeriveDataTypeable #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 
 module MGC.Check where
   import qualified Data.Map as M
@@ -6,6 +6,7 @@ module MGC.Check where
   import MGC.Error (TypeError(..), MGCError(..), transLeft)
   import MGC.Syntax
   import Data.Maybe (listToMaybe, mapMaybe)
+  import Control.Monad (when)
   import Control.Monad.State
   import Control.Monad.Except
   import Control.Applicative ((<$>), (<*>))
@@ -18,9 +19,9 @@ module MGC.Check where
   type Check = ExceptT TypeError (State (String, Counters, Env))
 
   class Checkable a where
-    check :: (a ()) -> Check (a Ann)
+    check :: a () -> Check (a Ann)
     checkList :: [a ()] -> Check [a Ann]
-    checkList = mapM (check)
+    checkList = mapM check
 
   instance Checkable Package where
     check (Package name pkg) = do
@@ -32,21 +33,21 @@ module MGC.Check where
       return $ Package name pkg'
 
   instance Checkable TopLevelDeclaration where
-    check (Decl t@(TypeDecl _)) = Decl <$> (check t)
-    check (Decl v@(VarDecl  _)) = Decl <$> (check v)
+    check (Decl t@(TypeDecl _)) = Decl <$> check t
+    check (Decl v@(VarDecl  _)) = Decl <$> check v
     check (FunctionDecl name sig body) = do
       addVar name $ Function sig
       pushScope
-      mapM (\(Parameter idens tp) -> mapM (\nm -> addVar nm tp) idens) $ (\(Signature s _) -> s) sig
+      mapM_ (\(Parameter idens tp) -> mapM ((`addVar` tp)) idens) $ (\(Signature s _) -> s) sig
       ret <- mapM (\(Parameter _ tp) -> alias tp) $ (\(Signature _ s) -> s) sig
-      let fRet = if length ret == 0 then TNil else ReturnType ret
-      modify (\(l,st, e) -> (l, (st {ret= fRet}), e)) 
+      let fRet = if null ret then TNil else ReturnType ret
+      modify (\(l,st, e) -> (l, st {ret= fRet}, e))
       b <- case body of
-        Block s -> Block <$> (checkList s)
+        Block s -> Block <$> checkList s
         Empty -> return Empty
         _ -> throwError $ ImpossibleError "Invalid function body"
       popScope
-      modify (\(l,st, e) -> (l, (st {ret= TNil}), e)) 
+      modify (\(l,st, e) -> (l, st {ret= TNil}, e))
       return $ FunctionDecl name sig b
     check (Decl _ ) = throwError $ ImpossibleError "Top Level Declaration invalid"
 
@@ -55,7 +56,7 @@ module MGC.Check where
       tps' <- mapM (\(TypeSpec _ n tp) -> do
         addType n tp
         uniqNm <- alias $ TypeName n
-        return $ TypeSpec Ann{ty = (TypeName n), truety = uniqNm } n tp
+        return $ TypeSpec Ann{ty = TypeName n, truety = uniqNm } n tp
         ) tps
       return $ TypeDecl tps'
     check (VarDecl vars) = do
@@ -68,13 +69,13 @@ module MGC.Check where
         ReturnType t -> case length t of
           0 -> throwError InvalidReturn
           1 -> return t
-          l -> if l == length e 
-            then return t 
-            else throwError $ InvalidReturn
+          l -> if l == length e
+            then return t
+            else throwError InvalidReturn
         a -> return [a]) e
-      case (ret tp) of
-        ReturnType t -> when (t /= (concat tps)) $ throwError $ InvalidReturn
-        TNil -> when (length e /= 0) $ throwError $ InvalidReturn
+      case ret tp of
+        ReturnType t -> when (t /= concat tps) $ throwError InvalidReturn
+        TNil -> when (not (null e)) $ throwError InvalidReturn
         _ -> throwError $ ImpossibleError "got non return type as function return"
       return $ Return e
     check (If stmt exp l r) = do -- check type
@@ -95,19 +96,17 @@ module MGC.Check where
       b <- check body
       popScope
       return $ For (Just c) b
-    check (For Nothing body) = For Nothing <$> (check body) -- check type
+    check (For Nothing body) = For Nothing <$> check body -- check type
     check (Switch stmt exp cls) = do -- check type
       pushScope
       s <- check stmt
       (e, tp) <- case exp of
         Nothing -> return (Nothing, TBool)
-        Just e -> (uncurry $ liftM2 (,)) (Just <$> (check e), typeOf <$> check e)
+        Just e -> (uncurry $ liftM2 (,)) (Just <$> check e, typeOf <$> check e)
       cls' <- checkList cls
-      mapM (\x -> case x of
-        Default _ -> return ()
-        Case e _ -> if (any ((tp /=) . typeOf ) e) 
-          then throwError $ InvalidCase e tp
-          else return ()) cls'
+      mapM_ (\x -> case x of
+         Default _ -> return ()
+         Case e _ -> Control.Monad.when (any ((tp /=) . typeOf ) e) $ throwError $ InvalidCase e tp) cls'
       popScope
       return $ Switch s e cls'
     check (Block stmts) = do
@@ -115,10 +114,10 @@ module MGC.Check where
       s <- checkList stmts
       popScope
       return $ Block s
-    check (ExpressionStmt e) = ExpressionStmt <$> (check e)
+    check (ExpressionStmt e) = ExpressionStmt <$> check e
     check (Inc exp) = do
       e <- check exp
-      case (truety $ annOf e) of
+      case truety $ annOf e of
         TRune -> return $ Inc e
         TString -> return $ Inc e
         TFloat -> return $ Inc e
@@ -126,7 +125,7 @@ module MGC.Check where
         t -> throwError $ InvalidIncDec e t
     check (Dec exp) = do
       e <- check exp
-      case (truety $ annOf e) of
+      case truety $ annOf e of
         TRune -> return $ Dec e
         TString -> return $ Dec e
         TFloat -> return $ Dec e
@@ -135,54 +134,52 @@ module MGC.Check where
     check (Assignment Eq lh rh) = do
       lhs <- checkList lh
       rhs <- checkList rh
-      mapM (\(l, r) -> when (l /= r) $ throwError (Mismatch l r)) $ zip (typeList lhs) (typeList rhs)
+      mapM_ (\(l, r) -> when (l /= r) $ throwError (Mismatch l r)) $ zip (typeList lhs) (typeList rhs)
       return $ Assignment Eq  lhs rhs
     check (Assignment op lh rh) = do --accept += string
       lhs <- checkList lh
       rhs <- checkList rh
-      mapM (\(l, r) -> when (l /= r) $ throwError (Mismatch l r)) $ zip (typeList lhs) (typeList rhs)
+      mapM_ (\(l, r) -> when (l /= r) $ throwError (Mismatch l r)) $ zip (typeList lhs) (typeList rhs)
       alLhs <- alias $ typeOf $ head lhs
       if isNumOp op
-      then when (not $ (TString == (truety $ annOf $ head rhs)) || (isNum $ alLhs)) $ throwError (InvalidOpType op (head lhs) (head rhs))
-      else when (not $ isInt $ alLhs) $ throwError (InvalidOpType op (head lhs) (head rhs))
+      then unless ((TString == (truety $ annOf $ head rhs)) || (isNum $ alLhs)) $ throwError (InvalidOpType op (head lhs) (head rhs))
+      else unless (isInt $ alLhs) $ throwError (InvalidOpType op (head lhs) (head rhs))
       return $ Assignment op lhs rhs
     check (ShortDecl idents exps) = do
       decls <- mapM decl idents
       when (all (==True) decls) (throwError NoNewVars)
       e <- checkList exps
-      mapM (\(d, id, e) -> case d of 
-        True -> do
-          v <- checkVar id
-          if (ty v) == (typeOf e)
-          then return (typeOf e)
-          else throwError NoNewVars
-        False -> addVar id (typeOf e) >> return (typeOf e) ) $ zip3 decls idents e
+      mapM_ (\(d, id, e) -> if d then (do
+                              v <- checkVar id
+                              if (ty v) == (typeOf e)
+                              then return (typeOf e)
+                              else throwError NoNewVars) else addVar id (typeOf e) >> return (typeOf e) ) $ zip3 decls idents e
       return $ ShortDecl idents e
-    check (Empty) = return Empty
-    check (Continue) = return Continue
-    check (Break) = return Break
-    check (Fallthrough) = return Fallthrough
+    check Empty = return Empty
+    check Continue = return Continue
+    check Break = return Break
+    check Fallthrough = return Fallthrough
 
   instance Checkable ForCond where
-    check (Condition e)            = Condition <$> (check e >>= (hasType TBool (throwError InvalidFor)))
-    check (ForClause s (Just a) p) = ForClause <$> (check s) <*> (Just <$> (check a >>= (hasType TBool (throwError InvalidFor)))) <*> (check p)
-    check (ForClause s Nothing p)  = ForClause <$> (check s) <*> (return Nothing) <*> (check p)
-  
+    check (Condition e)            = Condition <$> (check e >>= hasType TBool (throwError InvalidFor))
+    check (ForClause s (Just a) p) = ForClause <$> check s <*> (Just <$> (check a >>= hasType TBool (throwError InvalidFor))) <*> check p
+    check (ForClause s Nothing p)  = ForClause <$> check s <*> return Nothing <*> check p
+
   instance Checkable VarSpec where
     check (VarSpec _ idens exps Nothing) = do -- dont ignore tp check double declarations
       tps <- checkList exps
-      mapM (\(i, t) -> addVar i (typeOf t) ) $ zip idens tps
+      mapM_ (\(i, t) -> addVar i (typeOf t) ) $ zip idens tps
       return $ VarSpec (ann TNil) idens tps Nothing
     check (VarSpec _ idens exps (Just t)) = do
       tps <- checkList exps
       trueT <- alias t
       when (any ((trueT /=).typeOf ) tps) $ throwError $ InvalidVarDec t tps
-      mapM (\i -> addVar i trueT ) idens
+      mapM_ ((`addVar` trueT) ) idens
       return $ VarSpec Ann{ty = t, truety = trueT} idens tps (Just t)
 
-  instance Checkable (SwitchClause) where
-    check (Default stmts) = inScope $ do{ Default <$> (checkList stmts) }
-    check (Case es stmts) = Case <$> (checkList es) <*> (inScope $ checkList stmts)
+  instance Checkable SwitchClause where
+    check (Default stmts) = inScope $ Default <$> (checkList stmts)
+    check (Case es stmts) = Case <$> checkList es <*> inScope (checkList stmts)
 
   instance Checkable Expression where
     check (BinaryOp () op l r) = do -- check op type
@@ -197,24 +194,24 @@ module MGC.Check where
         a | isOrdOp a -> when ((lhtp /= rhtp) || not (isOrd lhraw)) $ throwError (InvalidOpType a lh rh)
         a | isNumOp a -> when ((lhtp /= rhtp) || not (isNum lhraw)) $ throwError (InvalidOpType a lh rh)
         a | isIntOp a -> when ((lhtp /= rhtp) || not (isInt lhraw)) $ throwError (InvalidOpType a lh rh)
-        a             -> when ((lhtp /= rhtp) || not (TBool==lhraw)) $ throwError (InvalidOpType a lh rh)
+        a             -> when ((lhtp /= rhtp) || TBool /= lhraw) $ throwError (InvalidOpType a lh rh)
       return $ BinaryOp (binOpAnn op lhtp lhraw) op lh rh
     check (UnaryOp () op r) = do -- check op type
       rh <- check r
       case op of
-        Neg   -> when (not$ isNum (truety $ annOf rh)) $ throwError (InvalidUOp op rh)
-        Pos   -> when (not$ isNum (truety $ annOf rh)) $ throwError (InvalidUOp op rh)
-        Not   -> when (not$ (==TBool) (truety $ annOf rh)) $ throwError (InvalidUOp op rh)
-        BComp -> when (not$ isInt (truety $ annOf rh))     $ throwError (InvalidUOp op rh)
+        Neg   -> unless (isNum (truety $ annOf rh)) $ throwError (InvalidUOp op rh)
+        Pos   -> unless (isNum (truety $ annOf rh)) $ throwError (InvalidUOp op rh)
+        Not   -> unless ((==TBool) (truety $ annOf rh)) $ throwError (InvalidUOp op rh)
+        BComp -> unless (isInt (truety $ annOf rh))     $ throwError (InvalidUOp op rh)
       return $ UnaryOp (ann $ typeOf rh) op rh
     check (Conversion () tp r) = do
       rh <- check r
-      tTp <- rawType $ tp
+      tTp <- rawType tp
       trh <- rawType $ typeOf rh
       alTp <- alias tp
       let a = Ann{ty = alTp, truety = tTp}
       let prims = [TInteger, TFloat, TBool, TRune]
-      when (not (elem tTp prims || elem trh prims)) $ throwError $ InvalidCast tp (typeOf rh)
+      unless (elem tTp prims || elem trh prims) $ throwError $ InvalidCast tp (typeOf rh)
       return $ Conversion a tp rh
     check (Selector () l i) = do
       lh <- check l
@@ -234,60 +231,60 @@ module MGC.Check where
           _ -> throwError $ InvalidIndex (typeOf lh) (typeOf idx)
       a <- alias tp
       t <- rawType tp
-      return $ Index (Ann{ ty = a, truety = t}) lh idx
+      return $ Index Ann{ ty = a, truety = t} lh idx
     check (Arguments () (Name () "println") a) = do
       a' <- checkList a
       at <- mapM (rawType . typeOf) a'
-      when (not $ all (isPrim) at) $ throwError InvalidPrint
+      unless (all (isPrim) at) $ throwError InvalidPrint
       return $ Arguments (ann TNil) (Name (ann TNil) "println") a'
     check (Arguments () (Name () "print")  a) = do
       a' <- checkList a
       at <- mapM (rawType . typeOf) a'
-      when (not $ all (isPrim) at) $ throwError InvalidPrint
+      unless (all (isPrim) at) $ throwError InvalidPrint
       return $ Arguments (ann TNil) (Name (ann TNil) "println") a'
     check (Arguments () (Name () "append") a) = do
       a' <- checkList a
-      if length a' /= 2 then (throwError InvalidAppend) else (return ())
+      Control.Monad.when (length a' /= 2) (throwError InvalidAppend)
       tp' <- rawType $ typeOf (head a')
       let altp = ann $ typeOf (head a')
       tp <- case tp' of
         Slice t -> alias t
         _ -> throwError InvalidAppend
-      when (tp /= (typeOf $ last a')) $ throwError $ InvalidAppend
-      return $ Arguments (altp) (Name (ann TNil) "append") a'
+      when (tp /= typeOf (last a')) $ throwError InvalidAppend
+      return $ Arguments altp (Name (ann TNil) "append") a'
     check (Arguments () l args) = do
       lh <- check l
       case (typeOf lh , lh) of
         (Function (Signature farg tp),_) -> do
           rh <- checkList args
-          if (map typeOf rh) /= (funcTypes farg)
-          then throwError $ InvalidFuncCall
-          else return $ Arguments (Ann{ty = head $ funcTypes tp, truety =head $ funcTypes tp}) lh rh
-        (t, Name _ n) -> if not (isAlias t || isPrim t) 
-          then  throwError $  InvalidFuncCall
+          if map typeOf rh /= funcTypes farg
+          then throwError InvalidFuncCall
+          else return $ Arguments Ann{ty = head $ funcTypes tp, truety =head $ funcTypes tp} lh rh
+        (t, Name _ n) -> if not (isAlias t || isPrim t)
+          then  throwError InvalidFuncCall
           else if length args == 1
           then check (Conversion () (TypeName n) (head args))
           else throwError $ TypeError "Too many args for conversion"
-        (_,_) -> throwError $ InvalidFuncCall
-      
-    check (Name () nm) = Name <$> (checkVar nm) <*> (return nm)
+        (_,_) -> throwError InvalidFuncCall
+
+    check (Name () nm) = Name <$> checkVar nm <*> return nm
     check (Integer i) = return $ Integer i
     check (Float f)   = return $ Float f
     check (IntString s) = return $ IntString s
     check (RawString s) = return $ RawString s
     check (Rune r) = return $ Rune r
     check (Bool b) = return $ Bool b
-    check (SimpleSlice _ _ _ _) = throwError $ ImpossibleError "Not Supported"
-    check (FullSlice _ _ _ _ _) = throwError $ ImpossibleError "Not Supported"
+    check (SimpleSlice{}) = throwError $ ImpossibleError "Not Supported"
+    check (FullSlice{}) = throwError $ ImpossibleError "Not Supported"
     check (QualName _ _) = throwError $ ImpossibleError "Not Supported"
 
   funcTypes :: [Parameter] -> [Type]
-  funcTypes = concat . map (\(Parameter idens typ) -> replicate (if (length idens) == 0 then 1 else (length idens)) typ)
+  funcTypes = concatMap (\(Parameter idens typ) -> replicate (if (length idens) == 0 then 1 else (length idens)) typ)
 
   runCheck :: String -> Env -> Check a -> (Either MGCError a, (String, Counters, Env))
   runCheck s f =  flip runState (s, C{ret = TNil,typCnt = 0}, f) . liftM (transLeft Typechecker) . runExceptT
 
-  typecheck :: Checkable a => (a ()) -> (Either MGCError (a Ann), (String, Counters, Env))
+  typecheck :: Checkable a => a () -> (Either MGCError (a Ann), (String, Counters, Env))
   typecheck = runCheck "" [] . check
 
   add f e n t = do
@@ -299,22 +296,22 @@ module MGC.Check where
 
   addType :: Identifier -> Type -> Check ()
   addType = add addType' RedeclaredType
-  
+
   addVar :: Identifier -> Type -> Check ()
   addVar  = add addVar'  RedeclaredVar
 
   addType' :: Identifier -> Ann -> (String, Counters, Env) -> (String, Counters, Env)
-  addType' i t (l, tp, x:xs) = (l,(tp { typCnt = (typCnt tp) + 1}), newX:xs)
-    where incNm = i++"."++(show $ typCnt tp)
+  addType' i t (l, tp, x:xs) = (l,tp { typCnt = (typCnt tp) + 1}, newX:xs)
+    where incNm = i++"."++show (typCnt tp)
           incTp = TypeName incNm
-          newX  = (M.insert i (Ann{ ty = incTp, truety = ty t}) (M.insert incNm t x))
+          newX  = M.insert i (Ann{ ty = incTp, truety = ty t}) (M.insert incNm t x)
   addType' _ _ (l, tp,   []) = (l, tp, [])
 
   addVar' :: Identifier -> Ann -> (String, Counters, Env) -> (String, Counters, Env)
-  addVar' i t (l, tp, x:xs) = (l, tp, (M.insert i t x):xs)
+  addVar' i t (l, tp, x:xs) = (l, tp, M.insert i t x:xs)
   addVar' _ _ (l, tp, [])   = (l, tp, [])
 
-  assign :: (Expression Ann) -> (Expression Ann) -> Check Bool
+  assign :: Expression Ann -> Expression Ann -> Check Bool
   assign a b = do
     ra <- rawType $ typeOf a
     rb <- rawType $ typeOf b
@@ -322,7 +319,7 @@ module MGC.Check where
 
   isPrim :: Type -> Bool
   isPrim TInteger = True
-  isPrim TFloat   = True 
+  isPrim TFloat   = True
   isPrim TString  = True
   isPrim TRune    = True
   isPrim TBool    = True
@@ -338,25 +335,25 @@ module MGC.Check where
                   | isNumOp o = Ann{ty = t, truety = tt}
   binOpAnn _ t tt             = Ann{ty= if tt == TBool then t else TBool, truety = TBool}
 
-  hasType t h exp = if (truety $ annOf exp) == t then return exp else h
+  hasType t h exp = if truety (annOf exp) == t then return exp else h
 
   rawType :: Type -> Check Type
-  rawType (TypeName t) = (checkVar t) >>= (\x -> rawType $ ty x)
-  rawType a = return $ a
+  rawType (TypeName t) = checkVar t >>= (rawType . ty)
+  rawType a = return a
 
   alias :: Type -> Check Type
   alias (TypeName t) = ty <$> checkVar t
   alias a = return a
 
   typeList :: [Expression Ann] -> [Type]
-  typeList (x:xs) = case typeOf x of 
-    ReturnType ts -> ts ++ (typeList xs)
-    t -> t:(typeList xs)
+  typeList (x:xs) = case typeOf x of
+    ReturnType ts -> ts ++ typeList xs
+    t -> t:typeList xs
   typeList [] = []
 
-  typeOf :: (Expression Ann) -> Type
+  typeOf :: Expression Ann -> Type
   typeOf (Integer _)        = TInteger
-  typeOf (Float _)          = TFloat 
+  typeOf (Float _)          = TFloat
   typeOf (IntString _)      = TString
   typeOf (RawString _)      = TString
   typeOf (Rune _)           = TRune
@@ -371,13 +368,13 @@ module MGC.Check where
   typeOf (SimpleSlice a _ _ _) = ty a
   typeOf (FullSlice a _ _ _ _) = ty a
   typeOf (QualName _ _) = TInteger
-  
-  ttOf :: (Expression Ann) -> Type
+
+  ttOf :: Expression Ann -> Type
   ttOf = truety . annOf
-  
-  annOf :: (Expression Ann) -> Ann
+
+  annOf :: Expression Ann -> Ann
   annOf (Integer _)        = ann TInteger
-  annOf (Float _)          = ann TFloat 
+  annOf (Float _)          = ann TFloat
   annOf (IntString _)      = ann TString
   annOf (RawString _)      = ann TString
   annOf (Rune _)           = ann TRune
@@ -393,9 +390,9 @@ module MGC.Check where
   annOf (FullSlice a _ _ _ _) = a
   annOf (QualName _ _) = ann TInteger
 
-  field :: Type -> Identifier -> (Maybe Type)
-  field (Struct decs) ident = listToMaybe $ mapMaybe (\x -> case x of 
-    NamedField nms tp _ -> if any ((==) ident) nms
+  field :: Type -> Identifier -> Maybe Type
+  field (Struct decs) ident = listToMaybe $ mapMaybe (\x -> case x of
+    NamedField nms tp _ -> if elem ident nms
       then Just tp
       else Nothing
     _ -> Nothing) decs
@@ -412,7 +409,7 @@ module MGC.Check where
   checkVar var = do
     (log, ret, env) <- get
     case env of
-      [] -> throwError $ NotInScope var 
+      [] -> throwError $ NotInScope var
       (x:xs) -> case M.lookup var x of
         Nothing -> do
           put (log, ret, xs)
@@ -422,16 +419,16 @@ module MGC.Check where
         (Just t) -> return t
 
   inScope :: Check a -> Check a
-  inScope c = do{pushScope; r <- c; popScope; return r} 
+  inScope c = do{pushScope; r <- c; popScope; return r}
 
   pushScope :: Check ()
   pushScope = do
     (log, tp, env) <- get
     put (log, tp, M.empty:env)
 
-  showEnv :: (Map String Ann) -> String
+  showEnv :: Map String Ann -> String
   showEnv e = unlines $ map aux $ M.assocs e
-    where aux (i,t) = i ++ ": " ++ (show $ ty t)
+    where aux (i,t) = i ++ ": " ++ show (ty t)
 
   popScope  :: Check ()
   popScope = do

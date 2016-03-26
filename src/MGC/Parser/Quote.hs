@@ -28,8 +28,8 @@ tld = QuasiQuoter {
           Left e -> error $ show e
           Right a -> case runWeeder a of
             Left e -> error $ show e
-            Right a -> case (runCheck "" [M.empty]) $ check a of
-              (Left e, _) -> error $ show e 
+            Right a -> case runCheck "" [M.empty] $ check a of
+              (Left e, _) -> error $ show e
               (Right a, _) -> return a
 
         dataToExpQ (const Nothing) c
@@ -46,8 +46,8 @@ pkg = QuasiQuoter {
       Left e -> error $ show e
       Right a -> case runWeeder a of
         Left e -> error $ show e
-        Right a -> case (runCheck "" [M.empty]) $ check a of
-          (Left e, _) -> error $ show e 
+        Right a -> case runCheck "" [M.empty] $ check a of
+          (Left e, _) -> error $ show e
           (Right a, _) -> return a
     dataToExpQ (const Nothing) c
   , quotePat  = undefined

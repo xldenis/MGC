@@ -6,19 +6,19 @@ module MGC.Parser.Type  where
   import Text.Parsec
   import Text.Parsec.String
   import Control.Applicative ((<$>), (<*>), (<*), (*>))
-  
+
   typeParser :: Parser Type
-  typeParser = (typeName <|> typeLit <|> (parens typeParser)) <* lineSpace <?> "type"
+  typeParser = (typeName <|> typeLit <|> parens typeParser) <* lineSpace <?> "type"
 
   typeName :: Parser Type
-  typeName = TypeName <$> (try $ reservedType) <?> "builtin type"
+  typeName = TypeName <$> (try reservedType) <?> "builtin type"
 
   typeLit :: Parser Type
   typeLit = builtins <|> arrayType <|> functionType  <|> interfaceType <|> sliceType <|> structType -- <|> pointerType
 
   arrayType :: Parser Type
   arrayType = try $ do
-    len <- (brackets expression)
+    len <- brackets expression
     l <- case len of
       Integer i -> return i
       _ -> fail "Invalid Array length"
@@ -29,11 +29,11 @@ module MGC.Parser.Type  where
   sliceType = try $ string "[]" *> (Slice <$> typeParser)
 
   builtins :: Parser Type
-  builtins = try $ (do
-        (try $ lexeme "int" *> return TInteger) 
-    <|> (try $ lexeme "float64" *> return TFloat) 
-    <|> (try $ lexeme "rune" *> return TRune) 
-    <|> (try $ lexeme "string" *> return TString) 
+  builtins = try (do
+        (try $ lexeme "int" *> return TInteger)
+    <|> (try $ lexeme "float64" *> return TFloat)
+    <|> (try $ lexeme "rune" *> return TRune)
+    <|> (try $ lexeme "string" *> return TString)
     <|> (try $ lexeme "bool" *> return TBool))
 
   structType :: Parser Type
@@ -50,16 +50,16 @@ module MGC.Parser.Type  where
     case tg of
       Just (IntString s) -> return $ Just s
       Just (RawString s) -> return $ Just s
-      Nothing -> return $ Nothing
+      Nothing -> return Nothing
       _ -> fail "Impossible parse"
 
 
   namedField = try $ do
-    p <- (,) <$>  (option [] identifierList) <*> typeParser
+    p <- (,) <$>  option [] identifierList <*> typeParser
     t <- tag
-    return $ NamedField (fst p) (snd p) t
+    return $ uncurry NamedField p t
 
-  anonField = try $ (AnonField <$> ((optional $ (char '*')) *> typeName) <*> tag)
+  anonField = try (AnonField <$> ((optional $ (char '*')) *> typeName) <*> tag)
 
   functionType :: Parser Type
   functionType = try $ do
@@ -69,16 +69,16 @@ module MGC.Parser.Type  where
   interfaceType :: Parser Type
   interfaceType = try $ do
     lexeme "interface"
-    Interface <$> (braces' $ many (methodSpec <* semi))
+    Interface <$> braces' (many (methodSpec <* semi))
 
   methodSpec :: Parser MethodSpec
-  methodSpec = try $ do
+  methodSpec = try $
     (MethodSpec <$> identifier <*> signature <|> InterfaceName <$> identifier)
 
   signature :: Parser Signature
   signature = try $ do
     params <- parameters
-    result <- optionMaybe $ parameters <|> ((flip (:) []) <$> (Parameter [] <$> (typeParser <* fullSpace)))
+    result <- optionMaybe $ parameters <|> (flip (:) [] <$> (Parameter [] <$> (typeParser <* fullSpace)))
     case result of
       Nothing -> return $Signature params []
       Just res -> return $ Signature params res
@@ -86,4 +86,4 @@ module MGC.Parser.Type  where
   parameters = try $ parens $ param `sepEndBy` lexeme ","
 
   param :: Parser Parameter
-  param = try $ do{ids<-(option [] identifierList); tp<-typeParser; return $ Parameter ids tp}
+  param = try $ do{ids<-option [] identifierList; tp<-typeParser; return $ Parameter ids tp}

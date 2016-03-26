@@ -7,7 +7,7 @@ module MGC.Error where
     | Typechecker TypeError
     | Weeder      WeederError deriving Show
 
-  data WeederError 
+  data WeederError
     = MultipleDefault
     | EmptyFuncBody
     | InvalidTopLevelDecl
@@ -37,8 +37,8 @@ module MGC.Error where
     | InvalidReturn
     | InvalidFor
     | InvalidUOp UOp (Expression Ann)
-    | InvalidVarDec Type [Expression Ann] 
-    | Mismatch Type Type 
+    | InvalidVarDec Type [Expression Ann]
+    | Mismatch Type Type
     | MissingField Type Identifier
     | NoNewVars
     | NotInScope String
@@ -49,4 +49,4 @@ module MGC.Error where
   transLeft :: (a -> b) -> Either a c -> Either b c
   transLeft f e = case e of
     Left a ->  Left  $ f a
-    Right c -> Right $ c
+    Right c -> Right c

@@ -33,12 +33,12 @@ library
     MGC
   other-modules:
     Paths_mgc
-  build-depends:      base >=4 && <4.8,
+  build-depends:      base >=4,
                       parsec >= 3.0,
                       pretty >= 1,
                       containers,
                       mtl >= 2.2,
-                      llvm-general >= 3.4.5.0,
+                      llvm-general == 3.4.5.4,
                       llvm-general-pure,
                       template-haskell
   hs-source-dirs:     src
@@ -52,13 +52,13 @@ library
 executable mgc
   main-is:            Main.hs    
   build-depends:      mgc,
-                      base >=4 && <4.8,
+                      base >=4,
                       parsec >= 3.0,
                       pretty >= 1,
                       filepath,
                       containers, 
                       cmdargs,
-                      llvm-general >= 3.4.5.0,
+                      llvm-general == 3.4.5.4,
                       llvm-general-pure,
                       mtl >= 2.2
   hs-source-dirs:     src

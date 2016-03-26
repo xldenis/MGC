@@ -23,18 +23,18 @@ module MGC.Syntax where
    | Index a (Expression a) (Expression a)
    | SimpleSlice a (Expression a) (Expression a) (Expression a)
    | FullSlice a (Expression a) (Expression a) (Expression a) (Expression a)
-   | Arguments a (Expression a) [(Expression a)]
+   | Arguments a (Expression a) [Expression a]
    | Name a Identifier
    | QualName Identifier Identifier
-   | Integer Int  
+   | Integer Int
    | Rune String
    | Float Double
-   | IntString String 
+   | IntString String
    | Bool Bool
    | RawString String deriving (Show, Eq, Typeable, Data)
 
-  data BinOp 
-    = Or | And 
+  data BinOp
+    = Or | And
     | Eq | NEq | LessThan | LessThanEq | GreaterThan | GreaterThanEq
     | Plus | Minus | BitOr | BitXor
     | Mult | Div | Mod | LShift | RShift | BitAnd | BitClear  deriving (Show, Eq, Typeable, Data)
@@ -68,13 +68,13 @@ module MGC.Syntax where
   data SwitchClause a
     = Default [Statement a]
     | Case [Expression a] [Statement a] deriving (Show, Eq, Typeable, Data)
-  
+
   data Type
-    = TypeName Identifier 
-    | Array Int Type 
+    = TypeName Identifier
+    | Array Int Type
     | Struct [FieldDecl]
     | Function Signature
-    | Interface [MethodSpec] 
+    | Interface [MethodSpec]
     | ReturnType [Type]
     | Slice Type
     | TInteger
@@ -86,11 +86,11 @@ module MGC.Syntax where
 
   data Ann = Ann{ ty :: Type, truety :: Type} deriving (Show, Typeable, Data)
 
-  data FieldDecl  
-    = NamedField [Identifier] Type (Maybe String) 
+  data FieldDecl
+    = NamedField [Identifier] Type (Maybe String)
     | AnonField Type (Maybe String) deriving (Show, Eq, Typeable, Data)
-  data MethodSpec 
-    = MethodSpec Identifier Signature 
+  data MethodSpec
+    = MethodSpec Identifier Signature
     | InterfaceName Identifier  deriving (Show, Eq, Typeable, Data)
 
   isMulOp :: BinOp -> Bool
@@ -145,7 +145,7 @@ module MGC.Syntax where
   isIntOp BitXor    = True
   isIntOp Mod       = True
   isIntOp _         = False
-  
+
   isCmpOp Eq        = True
   isCmpOp NEq       = True
   isCmpOp _         = False
