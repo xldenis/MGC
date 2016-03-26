@@ -1,0 +1,12 @@
+flags: {}
+extra-package-dbs: []
+packages:
+- '.'
+extra-deps:
+- base-prelude-1
+  #- llvm-general-3.4.5.4
+- llvm-general-3.5.1.2
+  #- llvm-general-pure-3.4.5.4
+- llvm-general-pure-3.5.1.0
+- text-1.2.2.0
+resolver: lts-5.5

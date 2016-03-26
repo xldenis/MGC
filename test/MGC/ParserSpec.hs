@@ -6,12 +6,13 @@ module MGC.ParserSpec (spec) where
   import MGC.Parser
   import MGC.Syntax
   import Test.Hspec
+  import Data.Text (unpack)
   import Control.Applicative ((<|>))
 
   spec :: Spec
   spec = do
     describe "topLevelDeclaration" $ do
-      it "parses Declarations" $ do 
+      it "parses Declarations" $ do
           pending
       it "parses functions" $ do
         pending
@@ -22,7 +23,7 @@ module MGC.ParserSpec (spec) where
       it "parses multi-type delcarations" $ do
         typeDec `parses` "type ( Polar Point; IntArray [16]int)" ~> TypeDecl [TypeSpec () "Polar" (TypeName "Point"), TypeSpec () "IntArray" $ Array (16) (TInteger)]
       it "parses multi-line types" $ do
-        let test = [string|
+        let test = unpack [text|
           type (
             Polar Point
             IntArray [16]int
@@ -44,7 +45,7 @@ module MGC.ParserSpec (spec) where
       it "works with else branch" $ do
         ifStmt `parses` "if 0 {1}else{0}" ~> (If Empty (Integer 0) (Block [(ExpressionStmt (Integer 1))]) (Block [(ExpressionStmt (Integer 0))]))
       it "works with else if branch" $ do
-        let test = [string| 
+        let test = unpack [text|
           if 0 {
             1
           } else if 1 {
@@ -71,7 +72,7 @@ module MGC.ParserSpec (spec) where
         forStmt `parses` "for x = 0; x<10; x++ {}" ~> (For (Just $ ForClause (Assignment Eq [(Name () "x")] [(Integer 0)]) (Just $ BinaryOp () LessThan (Name () "x") (Integer 10)) (Inc $ Name () "x")) (Block []))
       it "works with expression loops" $ do
         forStmt `parses` "for x<y {}" ~> (For (Just $ Condition (BinaryOp () LessThan (Name () "x") (Name () "y"))) (Block []))
-        
+
 
     describe "shortDec" $ do
       it "parses single lhs & rhs" $ do
@@ -79,7 +80,7 @@ module MGC.ParserSpec (spec) where
       it "parses empty idents" $ do
         shortDec `parses` "_ := wtf" ~> (ShortDecl [("_")] [(Name () "wtf")])
       it "parses complex lhs & rhs" $ do
-        shortDec `parses` "a,b , c := a" ~> (ShortDecl ["a", "b", "c"] [(Name () "a")])  
+        shortDec `parses` "a,b , c := a" ~> (ShortDecl ["a", "b", "c"] [(Name () "a")])
 
     describe "switch" $ do
       it "parses expression switches" $ do
@@ -97,7 +98,7 @@ module MGC.ParserSpec (spec) where
       it "parses func x(int) int" $ do
         funcDec `parses` "func x(int) int " ~> FunctionDecl "x" (Signature [Parameter [] TInteger] [Parameter [] TInteger]) Empty
       it "parses full functions" $ do
-        let test = [string|
+        let test = unpack [text|
           func x(y int) bool {
             y++
           }
@@ -125,11 +126,11 @@ module MGC.ParserSpec (spec) where
 
     describe "assign" $ do
       it "parses single var assignment" $ do
-        assign `parses` "test = 5" ~> (Assignment Eq [(Name () "test")] [(Integer 5)]) 
+        assign `parses` "test = 5" ~> (Assignment Eq [(Name () "test")] [(Integer 5)])
       it "parses multi var assignment" $ do
         assign `parses` "test, x, y = 5" ~> (Assignment Eq [(Name () "test"), (Name () "x"), (Name () "y")] [(Integer 5)])
       it "op assignments only allow one element on each side" $ do
-        (assign <|> opAssign) `wontParse` "test, x *= 5"  
+        (assign <|> opAssign) `wontParse` "test, x *= 5"
       it "assignments allow blank idents but op ones dont" $ do
         assign `parses` "_ = 5" ~> (Assignment Eq [(Name () "_")] [(Integer 5)])
         opAssign `wontParse` "_ = 5"

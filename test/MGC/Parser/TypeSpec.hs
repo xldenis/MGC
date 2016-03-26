@@ -6,8 +6,10 @@ module MGC.Parser.TypeSpec (spec) where
   import MGC.Syntax
   import Test.Hspec
 
+  import Data.Text
+
   spec :: Spec
-  spec = do 
+  spec = do
     describe "typeName" $ do
       it "parses strings" $ do
         typeName `parses` "test" ~> TypeName "test"
@@ -24,7 +26,7 @@ module MGC.Parser.TypeSpec (spec) where
           typeParser `parses` "struct{}" ~> (Struct [])
 
         it "parses complex structs" $ do
-          let test = [string| 
+          let test = unpack [text|
             struct {
               x, y int "test"
               u float32

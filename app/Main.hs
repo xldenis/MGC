@@ -11,7 +11,7 @@ import MGC.Syntax.Weeder (runWeeder)
 import MGC.Emit (emit)
 
 import Control.Applicative ((<$>), (<*))
-import Control.Monad (liftM, when)
+import Control.Monad (liftM, when, (>=>))
 
 data Options = Options {astPrint :: Bool, files :: [String], test :: Bool, dumpsymtab :: Bool, pptype :: Bool, fmt :: Bool } deriving (Show, Data, Typeable)
 

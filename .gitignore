@@ -9,6 +9,9 @@ dist/
 # Cabal generated files
 *.config
 
+#
+.stack-work/
+
 # Latex build files
 doc/*.aux
 doc/*.aux
